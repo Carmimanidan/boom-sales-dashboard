@@ -15,6 +15,13 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
 .nav{position:sticky;top:0;z-index:100;background:rgba(10,14,26,.85);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.06);padding:14px 36px;margin:0 -36px 0;display:flex;align-items:center;justify-content:space-between}
 .nav-left h1{font-size:22px;font-weight:800;background:linear-gradient(135deg,#60a5fa,#a78bfa,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .nav-left .sub{font-size:12px;color:#475569;margin-top:2px}
+.nav-center{display:flex;align-items:center;gap:12px}
+.nav-center .view-btns{display:flex;gap:4px}
+.nav-center .view-btns button{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:#94a3b8;border-radius:8px;padding:6px 14px;cursor:pointer;font:600 12px Inter;transition:.2s}
+.nav-center .view-btns button:hover,.nav-center .view-btns button.active{background:rgba(96,165,250,.15);color:#60a5fa;border-color:rgba(96,165,250,.3)}
+.nav-center .nav-arr{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:#94a3b8;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:.2s}
+.nav-center .nav-arr:hover{background:rgba(96,165,250,.15);color:#60a5fa}
+.nav-center .week-label{font-size:13px;font-weight:600;color:#e2e8f0;min-width:180px;text-align:center}
 .nav-right{font-size:11px;color:#334155}
 
 /* ── Week Strip ── */
@@ -98,7 +105,17 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
     <h1>Boom Sales Dashboard</h1>
     <div class="sub">HubSpot Live Data &middot; 2026</div>
   </div>
-  <div class="nav-right">Updated: Feb 26, 2026 11:50</div>
+  <div class="nav-center">
+    <div class="view-btns">
+      <button class="active" onclick="setView('all',this)">All</button>
+      <button onclick="setView('weekly',this)">Weekly</button>
+      <button onclick="setView('monthly',this)">Monthly</button>
+    </div>
+    <button class="nav-arr" onclick="changeNav(-1)">&larr;</button>
+    <div class="week-label" id="navLabel">All Time (Jan 2026 – Now)</div>
+    <button class="nav-arr" onclick="changeNav(1)">&rarr;</button>
+  </div>
+  <div class="nav-right">Updated: Feb 26, 2026 12:02</div>
 </div>
 
 <!-- Week Strip -->
@@ -166,8 +183,9 @@ Chart.defaults.plugins.legend.labels.usePointStyle=true;
 const GC='rgba(255,255,255,.04)';
 const TT={backgroundColor:'#1e293b',titleColor:'#e2e8f0',bodyColor:'#94a3b8',borderColor:'rgba(255,255,255,.1)',borderWidth:1,cornerRadius:8,padding:12};
 
-let selectedWeekKey=null, charts={};
+let selectedWeekKey=null, currentView='all', monthIdx=-1, charts={};
 const SALES_AGENTS=["604265803","86713013","84989259","78025138"];
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // ── Sunday–Saturday Week Utils ──
 function sunWeekKey(ds){
@@ -242,13 +260,15 @@ function weekMeetingCounts(){
 }
 
 function getFilteredMeetings(){
-  if(!selectedWeekKey) return MEETINGS;
-  return MEETINGS.filter(m=>m.date&&sunWeekKey(m.date)===selectedWeekKey);
+  if(currentView==='monthly'&&monthIdx>=0) return MEETINGS.filter(m=>m.date&&new Date(m.date+'T00:00:00Z').getUTCMonth()===monthIdx);
+  if(selectedWeekKey) return MEETINGS.filter(m=>m.date&&sunWeekKey(m.date)===selectedWeekKey);
+  return MEETINGS;
 }
 
 function getFilteredDeals(){
-  if(!selectedWeekKey) return DEALS;
-  return DEALS.filter(d=>d.created&&sunWeekKey(d.created)===selectedWeekKey);
+  if(currentView==='monthly'&&monthIdx>=0) return DEALS.filter(d=>d.created&&new Date(d.created+'T00:00:00Z').getUTCMonth()===monthIdx);
+  if(selectedWeekKey) return DEALS.filter(d=>d.created&&sunWeekKey(d.created)===selectedWeekKey);
+  return DEALS;
 }
 
 // ── KPIs ──
@@ -471,13 +491,59 @@ function renderWeekStrip(){
 }
 
 function selectWeek(key){
-  if(selectedWeekKey===key){selectedWeekKey=null}else{selectedWeekKey=key}
-  renderWeekStrip();renderAll();
+  if(selectedWeekKey===key){selectedWeekKey=null;currentView='all'}else{selectedWeekKey=key;currentView='weekly'}
+  monthIdx=-1;
+  document.querySelectorAll('.view-btns button').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.view-btns button:nth-child(${selectedWeekKey?2:1})`).classList.add('active');
+  updateNavLabel();renderWeekStrip();renderAll();
 }
 
 function selectAll(){
   selectedWeekKey=null;
   renderWeekStrip();renderAll();
+}
+
+// ── Nav View Controls ──
+function setView(v,btn){
+  currentView=v;
+  if(v==='weekly'){
+    // Jump to current week in strip
+    selectedWeekKey=currentWeekKey();
+    monthIdx=-1;
+  }else if(v==='monthly'){
+    selectedWeekKey=null;
+    monthIdx=new Date().getMonth();
+  }else{
+    selectedWeekKey=null;
+    monthIdx=-1;
+  }
+  document.querySelectorAll('.view-btns button').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  updateNavLabel();renderWeekStrip();renderAll();
+}
+
+function changeNav(dir){
+  if(currentView==='weekly'){
+    const idx=allWeekKeys.indexOf(selectedWeekKey||currentWeekKey());
+    const next=Math.max(0,Math.min(allWeekKeys.length-1,idx+dir));
+    selectedWeekKey=allWeekKeys[next];
+    renderWeekStrip();
+  }else if(currentView==='monthly'){
+    monthIdx=Math.max(0,Math.min(11,monthIdx+dir));
+  }
+  updateNavLabel();renderAll();
+}
+
+function updateNavLabel(){
+  const el=document.getElementById('navLabel');
+  if(currentView==='all'){el.textContent='All Time (Jan 2026 – Now)';return}
+  if(currentView==='weekly'){
+    const key=selectedWeekKey||currentWeekKey();
+    const r=sunWeekRange(key);
+    el.textContent=r.label;
+    return;
+  }
+  if(currentView==='monthly'){el.textContent=MONTHS[monthIdx]+' 2026';return}
 }
 
 function renderAll(){
@@ -487,6 +553,7 @@ function renderAll(){
 }
 
 // ── Init ──
+updateNavLabel();
 renderWeekStrip();
 renderAll();
 </script>
