@@ -119,7 +119,8 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
 .md-cls-followup{background:rgba(251,191,36,.15);color:#fbbf24}
 .md-cls-unknown{background:rgba(100,116,139,.12);color:#64748b}
 .wc-cls{font-size:10px;color:#64748b;margin-top:2px}.wc-cls .n{color:#34d399}.wc-cls .f{color:#fbbf24}
-.md-company{font-weight:500;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.md-company{font-weight:500;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.md-company a{color:#e2e8f0;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,.15);transition:.15s}.md-company a:hover{color:#60a5fa;border-color:#60a5fa}
+.md-mtitle a{color:#e2e8f0;text-decoration:none;transition:.15s}.md-mtitle a:hover{color:#60a5fa}
 .md-listings{font-weight:700;font-size:11px;color:#a78bfa;text-align:center}
 .md-deal-link{text-align:center}.md-deal-link a{color:#60a5fa;text-decoration:none;font-size:14px;opacity:.7;transition:.15s}.md-deal-link a:hover{opacity:1}
 @media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.g2,.g21,.g12,.g3{grid-template-columns:1fr}.md-row{grid-template-columns:60px minmax(80px,1fr) minmax(60px,.8fr) 40px 90px 65px 65px 80px 26px;gap:6px;font-size:11px}.md-row.no-cls{grid-template-columns:60px minmax(80px,1fr) minmax(60px,.8fr) 40px 90px 65px 80px 26px;gap:6px}}
@@ -524,15 +525,18 @@ function renderMeetingDetail(){
   html+=`<div class="md-list">`;
   const rcls=HAS_CID?'':'no-cls';
   html+=`<div class="md-row md-row-head ${rcls}"><div>Day</div><div>Company</div><div>Title</div><div>List.</div><div>Agent</div><div>Type</div>${HAS_CID?'<div>Class</div>':''}<div>Outcome</div><div></div></div>`;
+  const HS='https://app.hubspot.com/contacts/24030694/record';
   sorted.forEach(m=>{
     const d=new Date(m.date+'T00:00:00Z');
     const dayName=days[d.getUTCDay()];
     const dateStr=d.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
     const co=m.cid?coMap[m.cid]:null;
     const coName=co?co.name:'–';
+    const coHtml=m.cid?`<a href="${HS}/0-2/${m.cid}" target="_blank" title="${coName}">${coName}</a>`:coName;
+    const mtitleHtml=`<a href="${HS}/0-47/${m.id}" target="_blank" title="${m.title}">${m.title}</a>`;
     const listings=co&&co.listings?co.listings:'–';
     const deal=m.cid?dealByCid[m.cid]:null;
-    const dealLink=deal?`<a href="https://app.hubspot.com/contacts/24030694/record/0-3/${deal.id}" target="_blank" title="${deal.name}">&#8599;</a>`:'–';
+    const dealLink=deal?`<a href="${HS}/0-3/${deal.id}" target="_blank" title="${deal.name}">&#8599;</a>`:'–';
     const agent=OWNERS[m.owner]||'–';
     const typeClass=m.type==='demo'?'md-type-demo':'md-type-disc';
     const typeLabel=m.type==='demo'?'Demo':'Discovery';
@@ -542,8 +546,8 @@ function renderMeetingDetail(){
     const clsLabel=m.cls==='new'?'New':m.cls==='followup'?'Follow-up':'–';
     html+=`<div class="md-row ${rcls}">
       <div class="md-day">${dayName}, ${dateStr}</div>
-      <div class="md-company" title="${coName}">${coName}</div>
-      <div class="md-mtitle" title="${m.title}">${m.title}</div>
+      <div class="md-company" title="${coName}">${coHtml}</div>
+      <div class="md-mtitle" title="${m.title}">${mtitleHtml}</div>
       <div class="md-listings">${listings}</div>
       <div class="md-agent">${agent}</div>
       <div class="${typeClass}">${typeLabel}</div>
