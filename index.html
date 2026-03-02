@@ -93,7 +93,27 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
 .scroll-box{max-height:400px;overflow-y:auto;padding-right:6px}
 .scroll-box::-webkit-scrollbar{width:4px}.scroll-box::-webkit-scrollbar-track{background:transparent}.scroll-box::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}
 .sec-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#334155;margin:4px 0 16px}
-@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.g2,.g21,.g12,.g3{grid-template-columns:1fr}}
+/* ── Meeting Detail Panel ── */
+.meeting-detail{max-height:0;overflow:hidden;transition:max-height .4s ease,opacity .3s ease;opacity:0;margin:0 -36px 0;padding:0 36px;background:rgba(10,14,26,.88);backdrop-filter:blur(12px)}
+.meeting-detail.open{max-height:600px;opacity:1;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,.06)}
+.md-header{display:flex;align-items:center;justify-content:space-between;padding:16px 0 12px}
+.md-header .md-title{font-size:13px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px}
+.md-header .md-count{font-size:13px;font-weight:700;color:#60a5fa}
+.md-header .md-close{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:#94a3b8;border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:.2s}
+.md-header .md-close:hover{background:rgba(244,114,182,.15);color:#f472b6;border-color:rgba(244,114,182,.3)}
+.md-list{max-height:420px;overflow-y:auto;padding-right:6px}
+.md-list::-webkit-scrollbar{width:4px}.md-list::-webkit-scrollbar-track{background:transparent}.md-list::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}
+.md-row{display:grid;grid-template-columns:72px 1fr 130px 80px 100px;gap:12px;align-items:center;padding:8px 12px;border-radius:10px;transition:.15s;font-size:12px}
+.md-row:hover{background:rgba(255,255,255,.04)}
+.md-row.md-row-head{color:#475569;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.8px;padding-bottom:4px}
+.md-row .md-day{font-weight:600;color:#64748b;font-size:11px}
+.md-row .md-mtitle{font-weight:500;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.md-row .md-agent{color:#94a3b8;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.md-type-disc{background:rgba(59,130,246,.15);color:#60a5fa;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;text-align:center}
+.md-type-demo{background:rgba(167,139,250,.15);color:#a78bfa;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;text-align:center}
+.md-out-COMPLETED{background:rgba(52,211,153,.12);color:#34d399}.md-out-SCHEDULED{background:rgba(96,165,250,.12);color:#60a5fa}.md-out-NO_SHOW{background:rgba(244,114,182,.12);color:#f472b6}.md-out-RESCHEDULED{background:rgba(251,191,36,.12);color:#fbbf24}.md-out-CANCELED{background:rgba(100,116,139,.12);color:#94a3b8}.md-out-Pending{background:rgba(51,65,85,.3);color:#475569}
+.md-out{padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;text-align:center;display:inline-block}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.g2,.g21,.g12,.g3{grid-template-columns:1fr}.md-row{grid-template-columns:60px 1fr 100px 70px 90px;gap:8px}}
 </style>
 </head>
 <body>
@@ -128,6 +148,9 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
   </div>
   <div class="week-strip" id="weekStrip"></div>
 </div>
+
+<!-- Meeting Detail Panel -->
+<div class="meeting-detail" id="meetingDetail"></div>
 
 <!-- KPIs -->
 <div class="kpis" id="kpis"></div>
@@ -445,6 +468,48 @@ function renderCompanies(){
   document.getElementById('compBox').innerHTML=html;
 }
 
+// ── Meeting Detail Panel ──
+function renderMeetingDetail(){
+  const panel=document.getElementById('meetingDetail');
+  if(!selectedWeekKey){panel.classList.remove('open');panel.innerHTML='';return}
+  const fm=getFilteredMeetings();
+  if(fm.length===0){panel.classList.remove('open');panel.innerHTML='';return}
+  // Sort by date
+  const sorted=[...fm].sort((a,b)=>a.date.localeCompare(b.date));
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const outLabels={COMPLETED:'Completed',SCHEDULED:'Scheduled',NO_SHOW:'No Show',RESCHEDULED:'Rescheduled',CANCELED:'Canceled'};
+  let html=`<div class="md-header">
+    <div class="md-title">Meeting breakdown</div>
+    <div class="md-count">${fm.length} meeting${fm.length!==1?'s':''}</div>
+    <button class="md-close" onclick="closeMeetingDetail()" title="Close">&times;</button>
+  </div>`;
+  html+=`<div class="md-list">`;
+  html+=`<div class="md-row md-row-head"><div>Day</div><div>Title</div><div>Agent</div><div>Type</div><div>Outcome</div></div>`;
+  sorted.forEach(m=>{
+    const d=new Date(m.date+'T00:00:00Z');
+    const dayName=days[d.getUTCDay()];
+    const dateStr=d.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
+    const agent=OWNERS[m.owner]||'–';
+    const typeClass=m.type==='demo'?'md-type-demo':'md-type-disc';
+    const typeLabel=m.type==='demo'?'Demo':'Discovery';
+    const outcome=m.outcome||'Pending';
+    const outLabel=outLabels[outcome]||outcome;
+    html+=`<div class="md-row">
+      <div class="md-day">${dayName}, ${dateStr}</div>
+      <div class="md-mtitle" title="${m.title}">${m.title}</div>
+      <div class="md-agent">${agent}</div>
+      <div class="${typeClass}">${typeLabel}</div>
+      <div class="md-out md-out-${outcome}">${outLabel}</div>
+    </div>`;
+  });
+  html+=`</div>`;
+  panel.innerHTML=html;
+  panel.classList.add('open');
+}
+function closeMeetingDetail(){
+  document.getElementById('meetingDetail').classList.remove('open');
+}
+
 // ── Week Strip ──
 function renderWeekStrip(){
   const counts=weekMeetingCounts();
@@ -549,7 +614,7 @@ function updateNavLabel(){
 function renderAll(){
   renderKPIs();renderPipeline();renderWeeklyChart();renderOutcomeChart();
   renderAgentChart();renderStageChart();renderPmsChart();renderSizeChart();
-  renderHeatmap();renderDeals();renderCompanies();
+  renderHeatmap();renderDeals();renderCompanies();renderMeetingDetail();
 }
 
 // ── Init ──
