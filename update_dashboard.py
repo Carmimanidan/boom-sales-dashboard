@@ -188,7 +188,15 @@ def transform_meetings(raw):
             "type": mtype,
         })
     result.sort(key=lambda x: x["date"] or "")
-    return result
+    # Dedupe by title+date+owner — keep the one with the most definitive outcome
+    outcome_rank = {"COMPLETED": 5, "NO_SHOW": 4, "RESCHEDULED": 3, "CANCELED": 2, "SCHEDULED": 1}
+    seen = {}
+    for m in result:
+        key = (m["date"], m["title"], m["owner"])
+        rank = outcome_rank.get(m["outcome"] or "", 0)
+        if key not in seen or rank > seen[key][1]:
+            seen[key] = (m, rank)
+    return [v[0] for v in sorted(seen.values(), key=lambda v: v[0]["date"] or "")]
 
 
 def transform_companies(raw):

@@ -197,6 +197,21 @@ const DEALS = [{"id": "57017139375", "name": "Julia - Staymo", "amount": 139200.
 const DEAL_STAGES = {"1075455291": "Discovery Completed", "1075460493": "Negotiation", "171811493": "Attack List", "1275009440": "Contract Sent", "1108564665": "Closed Won", "216501682": "Closed Lost", "1236301393": "Churn / Inactive"};
 // ═══════════════════════════════════════════════════
 
+// ── Deduplicate meetings (same title+date+owner → keep best outcome) ──
+(function(){
+  const rank={COMPLETED:5,NO_SHOW:4,RESCHEDULED:3,CANCELED:2,SCHEDULED:1};
+  const best=new Map();
+  MEETINGS.forEach(m=>{
+    const k=m.date+'|'+m.title+'|'+m.owner;
+    const r=rank[m.outcome]||0;
+    const prev=best.get(k);
+    if(!prev||r>prev[1])best.set(k,[m,r]);
+  });
+  MEETINGS.length=0;
+  best.forEach(v=>MEETINGS.push(v[0]));
+  MEETINGS.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+})();
+
 // ── Globals ──
 Chart.defaults.color='#64748b';
 Chart.defaults.font.family="'Inter',sans-serif";
