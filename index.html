@@ -103,7 +103,9 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
 .md-header .md-close:hover{background:rgba(244,114,182,.15);color:#f472b6;border-color:rgba(244,114,182,.3)}
 .md-list{max-height:420px;overflow-y:auto;padding-right:6px}
 .md-list::-webkit-scrollbar{width:4px}.md-list::-webkit-scrollbar-track{background:transparent}.md-list::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}
-.md-row{display:grid;grid-template-columns:72px 1fr 130px 80px 100px;gap:12px;align-items:center;padding:8px 12px;border-radius:10px;transition:.15s;font-size:12px}
+.md-row{display:grid;gap:12px;align-items:center;padding:8px 12px;border-radius:10px;transition:.15s;font-size:12px}
+.md-row.cols5{grid-template-columns:72px 1fr 130px 80px 100px}
+.md-row.cols6{grid-template-columns:72px 1fr 130px 80px 80px 100px}
 .md-row:hover{background:rgba(255,255,255,.04)}
 .md-row.md-row-head{color:#475569;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.8px;padding-bottom:4px}
 .md-row .md-day{font-weight:600;color:#64748b;font-size:11px}
@@ -113,7 +115,12 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
 .md-type-demo{background:rgba(167,139,250,.15);color:#a78bfa;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;text-align:center}
 .md-out-COMPLETED{background:rgba(52,211,153,.12);color:#34d399}.md-out-SCHEDULED{background:rgba(96,165,250,.12);color:#60a5fa}.md-out-NO_SHOW{background:rgba(244,114,182,.12);color:#f472b6}.md-out-RESCHEDULED{background:rgba(251,191,36,.12);color:#fbbf24}.md-out-CANCELED{background:rgba(100,116,139,.12);color:#94a3b8}.md-out-Pending{background:rgba(51,65,85,.3);color:#475569}
 .md-out{padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;text-align:center;display:inline-block}
-@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.g2,.g21,.g12,.g3{grid-template-columns:1fr}.md-row{grid-template-columns:60px 1fr 100px 70px 90px;gap:8px}}
+.md-cls{padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;text-align:center;display:inline-block}
+.md-cls-new{background:rgba(52,211,153,.15);color:#34d399}
+.md-cls-followup{background:rgba(251,191,36,.15);color:#fbbf24}
+.md-cls-unknown{background:rgba(100,116,139,.12);color:#64748b}
+.wc-cls{font-size:10px;color:#64748b;margin-top:2px}.wc-cls .n{color:#34d399}.wc-cls .f{color:#fbbf24}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.g2,.g21,.g12,.g3{grid-template-columns:1fr}.md-row.cols5{grid-template-columns:60px 1fr 100px 70px 90px;gap:8px}.md-row.cols6{grid-template-columns:60px 1fr 100px 70px 70px 90px;gap:8px}}
 </style>
 </head>
 <body>
@@ -210,6 +217,17 @@ const DEAL_STAGES = {"1075455291": "Discovery Completed", "1075460493": "Negotia
   MEETINGS.length=0;
   best.forEach(v=>MEETINGS.push(v[0]));
   MEETINGS.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+})();
+
+// ── Classify meetings: new (first per company) vs follow-up ──
+const HAS_CID=MEETINGS.some(m=>m.cid);
+(function(){
+  const seen={};
+  MEETINGS.forEach(m=>{
+    if(!m.cid){m.cls='unknown';return}
+    if(!seen[m.cid]){seen[m.cid]=1;m.cls='new'}
+    else{m.cls='followup'}
+  });
 })();
 
 // ── Globals ──
@@ -321,7 +339,7 @@ function renderKPIs(){
   const fmt=n=>n.toLocaleString('en-US');
   const fmtD=n=>'$'+n.toLocaleString('en-US',{maximumFractionDigits:0});
   document.getElementById('kpis').innerHTML=`
-    <div class="kpi"><div class="kpi-lbl">Total Meetings</div><div class="kpi-val">${fmt(fm.length)}</div><div class="kpi-det">Discovery + Demo</div></div>
+    <div class="kpi"><div class="kpi-lbl">Total Meetings</div><div class="kpi-val">${fmt(fm.length)}</div><div class="kpi-det">${HAS_CID?fm.filter(m=>m.cls==='new').length+' new · '+fm.filter(m=>m.cls==='followup').length+' follow-up':'Discovery + Demo'}</div></div>
     <div class="kpi"><div class="kpi-lbl">Completed</div><div class="kpi-val">${fmt(completed)}</div><div class="kpi-det">${fm.length?Math.round(completed/fm.length*100):0}% completion</div></div>
     <div class="kpi"><div class="kpi-lbl">Deals Created</div><div class="kpi-val">${fmt(fd.length)}</div><div class="kpi-det">Sales pipeline</div></div>
     <div class="kpi"><div class="kpi-lbl">Pipeline Value</div><div class="kpi-val">${fmtD(pipeVal)}</div><div class="kpi-det">${pipeDeals.length} open deals</div></div>
@@ -499,7 +517,8 @@ function renderMeetingDetail(){
     <button class="md-close" onclick="closeMeetingDetail()" title="Close">&times;</button>
   </div>`;
   html+=`<div class="md-list">`;
-  html+=`<div class="md-row md-row-head"><div>Day</div><div>Title</div><div>Agent</div><div>Type</div><div>Outcome</div></div>`;
+  const colCls=HAS_CID?'cols6':'cols5';
+  html+=`<div class="md-row md-row-head ${colCls}"><div>Day</div><div>Title</div><div>Agent</div><div>Type</div>${HAS_CID?'<div>Class</div>':''}<div>Outcome</div></div>`;
   sorted.forEach(m=>{
     const d=new Date(m.date+'T00:00:00Z');
     const dayName=days[d.getUTCDay()];
@@ -509,11 +528,14 @@ function renderMeetingDetail(){
     const typeLabel=m.type==='demo'?'Demo':'Discovery';
     const outcome=m.outcome||'Pending';
     const outLabel=outLabels[outcome]||outcome;
-    html+=`<div class="md-row">
+    const clsClass=m.cls==='new'?'md-cls-new':m.cls==='followup'?'md-cls-followup':'md-cls-unknown';
+    const clsLabel=m.cls==='new'?'New':m.cls==='followup'?'Follow-up':'–';
+    html+=`<div class="md-row ${colCls}">
       <div class="md-day">${dayName}, ${dateStr}</div>
       <div class="md-mtitle" title="${m.title}">${m.title}</div>
       <div class="md-agent">${agent}</div>
       <div class="${typeClass}">${typeLabel}</div>
+      ${HAS_CID?`<div class="md-cls ${clsClass}">${clsLabel}</div>`:''}
       <div class="md-out md-out-${outcome}">${outLabel}</div>
     </div>`;
   });
@@ -552,10 +574,18 @@ function renderWeekStrip(){
       deltaHtml=`<div class="wc-delta flat">&mdash;</div>`;
     }
 
+    let clsHtml='';
+    if(HAS_CID){
+      const wm=MEETINGS.filter(m=>m.date&&sunWeekKey(m.date)===key);
+      const nc=wm.filter(m=>m.cls==='new').length;
+      const fc=wm.filter(m=>m.cls==='followup').length;
+      clsHtml=`<div class="wc-cls"><span class="n">${nc} new</span> · <span class="f">${fc} f/u</span></div>`;
+    }
     html+=`<div class="wcard${isSelected?' selected':''}${isCurrent?' current':''}" data-week="${key}" onclick="selectWeek('${key}')">
       <div class="wc-dates">${isCurrent?'&#9679; ':''}${range.label}</div>
       <div class="wc-count">${cnt}</div>
       <div class="wc-label">meetings</div>
+      ${clsHtml}
       ${deltaHtml}
       <div class="wc-bar"><div class="wc-bar-fill" style="width:${pct}%"></div></div>
     </div>`;

@@ -92,6 +92,7 @@ def search_meetings(start_ts):
                     "hs_meeting_title", "hs_meeting_start_time", "hs_meeting_end_time",
                     "hs_meeting_outcome", "hubspot_owner_id"
                 ],
+                "associations": ["companies"],
                 "sorts": [{"propertyName": "hs_meeting_start_time", "direction": "ASCENDING"}],
                 "limit": 100,
                 "after": after,
@@ -179,6 +180,8 @@ def transform_meetings(raw):
         title = p.get("hs_meeting_title") or ""
         start = p.get("hs_meeting_start_time", "")
         mtype = "demo" if "demo" in title.lower() else "discovery"
+        assoc = m.get("associations", {}).get("companies", {}).get("results", [])
+        cid = assoc[0]["id"] if assoc else None
         result.append({
             "id": m["id"],
             "date": start[:10] if start else None,
@@ -186,6 +189,7 @@ def transform_meetings(raw):
             "outcome": p.get("hs_meeting_outcome") or None,
             "title": title,
             "type": mtype,
+            "cid": cid,
         })
     result.sort(key=lambda x: x["date"] or "")
     # Dedupe by title+date+owner — keep the one with the most definitive outcome
