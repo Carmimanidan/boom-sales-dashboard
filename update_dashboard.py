@@ -274,9 +274,9 @@ def inject_data(meetings, companies, deals, owners, updated_at):
         DATA_END,
     ])
 
-    # Replace between markers
+    # Replace between markers (use lambda to avoid backslash interpretation in replacement)
     pattern = re.escape(DATA_START) + r".*?" + re.escape(DATA_END)
-    html = re.sub(pattern, data_block, html, flags=re.DOTALL)
+    html = re.sub(pattern, lambda _: data_block, html, flags=re.DOTALL)
 
     # Update timestamp in nav
     html = re.sub(
