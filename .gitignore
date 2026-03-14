@@ -1,3 +1,4 @@
 .env
 update.log
 __pycache__/
+dashboard.html
