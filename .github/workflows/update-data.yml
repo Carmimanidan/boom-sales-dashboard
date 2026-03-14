@@ -4,11 +4,17 @@ on:
     - cron: '0 5 * * *'  # 05:00 UTC = 07:00 Israel daily
   workflow_dispatch:       # Allow manual trigger
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 jobs:
   update:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,3 +35,10 @@ jobs:
           git add index.html
           git diff --cached --quiet || git commit -m "Auto-update dashboard $(date -u +'%b %d, %Y %H:%M')"
           git push
+
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - id: deployment
+        uses: actions/deploy-pages@v4
