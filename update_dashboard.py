@@ -5,7 +5,7 @@ Pulls meetings, companies, deals & owners from HubSpot and generates dashboard H
 Run manually or via macOS LaunchAgent for daily updates.
 """
 
-import json, os, re, urllib.request, urllib.parse, urllib.error
+import json, os, re, time, urllib.request, urllib.parse, urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -41,20 +41,35 @@ OWNER_CACHE = {}
 
 
 # ── API Helpers ─────────────────────────────────────────────────────────
+MAX_RETRIES = 3
+RETRY_DELAY = 5  # seconds
+
+
+def _request_with_retry(req):
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read())
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            if attempt == MAX_RETRIES:
+                raise
+            print(f"    ⚠ API request failed (attempt {attempt}/{MAX_RETRIES}): {e}")
+            time.sleep(RETRY_DELAY * attempt)
+    raise RuntimeError("Unreachable")
+
+
 def api_get(path, params=None):
     url = BASE + path
     if params:
         url += "?" + urllib.parse.urlencode(params, doseq=True)
     req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req) as resp:
-        return json.loads(resp.read())
+    return _request_with_retry(req)
 
 
 def api_post(path, body):
     data = json.dumps(body).encode()
     req = urllib.request.Request(BASE + path, data=data, headers=HEADERS, method="POST")
-    with urllib.request.urlopen(req) as resp:
-        return json.loads(resp.read())
+    return _request_with_retry(req)
 
 
 # ── Data Fetchers ───────────────────────────────────────────────────────
