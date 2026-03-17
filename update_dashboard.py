@@ -126,6 +126,30 @@ def search_meetings(start_ts):
         if m["id"] not in seen:
             seen.add(m["id"])
             unique.append(m)
+
+    # Fetch company associations separately (search API doesn't reliably return them)
+    print(f"    Fetching company associations for {len(unique)} meetings...")
+    batch_size = 30
+    for i in range(0, len(unique), batch_size):
+        batch = unique[i:i + batch_size]
+        ids = [{"id": m["id"]} for m in batch]
+        body = {"inputs": ids}
+        try:
+            data = api_post("/crm/v4/associations/meetings/companies/batch/read", body)
+            for r in data.get("results", []):
+                mid = r.get("from", {}).get("id")
+                to_list = r.get("to", [])
+                if mid and to_list:
+                    # Inject into the meeting's associations
+                    for m in batch:
+                        if m["id"] == mid:
+                            m.setdefault("associations", {})["companies"] = {
+                                "results": [{"id": t["toObjectId"]} for t in to_list]
+                            }
+                            break
+        except Exception as e:
+            print(f"    ⚠ Association batch failed: {e}")
+
     return unique
 
 
