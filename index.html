@@ -49,9 +49,9 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
 
 /* ── KPI ── */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
-.kpi{background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:18px 22px;position:relative;overflow:hidden;transition:.2s}
+.kpi{background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:18px 22px;position:relative;overflow:visible;transition:.2s}
 .kpi:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,0,0,.3)}
-.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0;overflow:hidden}
 .kpi:nth-child(1)::before{background:linear-gradient(90deg,#60a5fa,#3b82f6)}
 .kpi:nth-child(2)::before{background:linear-gradient(90deg,#34d399,#10b981)}
 .kpi:nth-child(3)::before{background:linear-gradient(90deg,#a78bfa,#8b5cf6)}
@@ -64,6 +64,16 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
 .kpi-val{font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1}
 .kpi:nth-child(1) .kpi-val{color:#60a5fa}.kpi:nth-child(2) .kpi-val{color:#34d399}.kpi:nth-child(3) .kpi-val{color:#a78bfa}.kpi:nth-child(4) .kpi-val{color:#fbbf24}.kpi:nth-child(5) .kpi-val{color:#34d399}.kpi:nth-child(6) .kpi-val{color:#f472b6}.kpi:nth-child(7) .kpi-val{color:#fb923c}.kpi:nth-child(8) .kpi-val{color:#38bdf8}
 .kpi-det{font-size:11px;color:#475569;margin-top:4px}
+.kpi-info{position:absolute;top:10px;right:10px;width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#475569;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:help;transition:.2s;z-index:2;font-style:italic;font-family:Georgia,serif}
+.kpi-info:hover{background:rgba(96,165,250,.15);color:#60a5fa;border-color:rgba(96,165,250,.3)}
+.kpi-tooltip{display:none;position:absolute;top:32px;right:8px;z-index:50;background:#1e293b;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:12px 14px;width:280px;font-size:11px;line-height:1.5;color:#94a3b8;box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:none}
+.kpi-info:hover+.kpi-tooltip,.kpi-tooltip:hover{display:block;pointer-events:auto}
+.kpi-tooltip strong{color:#e2e8f0;font-weight:600}
+.kpi-tooltip .tt-formula{display:block;margin:6px 0;padding:6px 8px;background:rgba(255,255,255,.04);border-radius:6px;font-family:'SF Mono',Menlo,monospace;font-size:10px;color:#60a5fa}
+.pipe-info{width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);color:inherit;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;cursor:help;transition:.2s;font-style:italic;font-family:Georgia,serif;opacity:.5;margin-left:4;vertical-align:middle;position:relative}
+.pipe-info:hover{opacity:1;background:rgba(255,255,255,.15)}
+.pipe-tooltip{display:none;position:absolute;bottom:24px;left:50%;transform:translateX(-50%);z-index:50;background:#1e293b;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px 12px;width:240px;font-size:11px;line-height:1.5;color:#94a3b8;box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:none;text-align:left;font-style:normal;text-transform:none;letter-spacing:0;font-weight:400}
+.pipe-info:hover .pipe-tooltip{display:block}
 
 /* ── Cards & Grid ── */
 .grid{display:grid;gap:20px;margin-bottom:24px}.g2{grid-template-columns:1fr 1fr}.g21{grid-template-columns:2fr 1fr}.g12{grid-template-columns:1fr 2fr}.g3{grid-template-columns:1fr 1fr 1fr}
@@ -379,15 +389,32 @@ function renderKPIs(){
   const fmt=n=>n.toLocaleString('en-US');
   const fmtD=n=>'$'+n.toLocaleString('en-US',{maximumFractionDigits:0});
   const ak=activeKpi;
+  const info=(tip)=>`<div class="kpi-info" onclick="event.stopPropagation()">i</div><div class="kpi-tooltip">${tip}</div>`;
   document.getElementById('kpis').innerHTML=`
-    <div class="kpi${ak==='total-meetings'?' kpi-active':''}" onclick="toggleKpiDrawer('total-meetings')"><div class="kpi-lbl">Total Meetings</div><div class="kpi-val">${fmt(fm.length)}</div><div class="kpi-det">${completed} completed · ${noShows} no-show</div></div>
-    <div class="kpi${ak==='deals-created'?' kpi-active':''}" onclick="toggleKpiDrawer('deals-created')"><div class="kpi-lbl">Deals Created</div><div class="kpi-val">${fmt(fd.length)}</div><div class="kpi-det">${meetingToDeal}% meeting-to-deal</div></div>
-    <div class="kpi${ak==='pipeline-value'?' kpi-active':''}" onclick="toggleKpiDrawer('pipeline-value')"><div class="kpi-lbl">Pipeline Value</div><div class="kpi-val">${fmtD(pipeVal)}</div><div class="kpi-det">${pipeDeals.length} open deals</div></div>
-    <div class="kpi${ak==='closed-won'?' kpi-active':''}" onclick="toggleKpiDrawer('closed-won')"><div class="kpi-lbl">Closed Won</div><div class="kpi-val">${fmtD(wonVal)}</div><div class="kpi-det">${wonDeals.length} deals won</div></div>
-    <div class="kpi${ak==='win-rate'?' kpi-active':''}" onclick="toggleKpiDrawer('win-rate')"><div class="kpi-lbl">Win Rate</div><div class="kpi-val">${winRate}%</div><div class="kpi-det">${wonDeals.length}W / ${lostDeals.length}L of ${closedTotal} closed</div></div>
-    <div class="kpi${ak==='avg-deal'?' kpi-active':''}" onclick="toggleKpiDrawer('avg-deal')"><div class="kpi-lbl">Avg Deal Size</div><div class="kpi-val">${fmtD(avgDeal)}</div><div class="kpi-det">${wonDeals.length} closed won</div></div>
-    <div class="kpi${ak==='avg-cycle'?' kpi-active':''}" onclick="toggleKpiDrawer('avg-cycle')"><div class="kpi-lbl">Avg Sales Cycle</div><div class="kpi-val">${avgCycle}d</div><div class="kpi-det">${wonWithDates.length} deals measured</div></div>
-    <div class="kpi${ak==='no-shows'?' kpi-active':''}" onclick="toggleKpiDrawer('no-shows')"><div class="kpi-lbl">No Shows</div><div class="kpi-val">${fmt(noShows)}</div><div class="kpi-det">${fm.length?Math.round(noShows/fm.length*100):0}% rate</div></div>
+    <div class="kpi${ak==='total-meetings'?' kpi-active':''}" onclick="toggleKpiDrawer('total-meetings')">
+      ${info(`<strong>Total Meetings</strong><br>All Discovery and Demo meetings booked in HubSpot since Jan 2026. Includes every outcome: completed, scheduled, no-show, rescheduled, and canceled.<span class="tt-formula">Count of all meeting records</span>Click to see the full list.`)}
+      <div class="kpi-lbl">Total Meetings</div><div class="kpi-val">${fmt(fm.length)}</div><div class="kpi-det">${completed} completed · ${noShows} no-show</div></div>
+    <div class="kpi${ak==='deals-created'?' kpi-active':''}" onclick="toggleKpiDrawer('deals-created')">
+      ${info(`<strong>Deals Created</strong><br>Deals added to the sales pipeline in HubSpot. The conversion % shows how many completed meetings it takes to generate a deal.<span class="tt-formula">${fd.length} deals / ${completed} completed meetings = ${meetingToDeal}%</span>A higher % means your qualification is tight. A lower % may mean you're taking meetings outside ICP.`)}
+      <div class="kpi-lbl">Deals Created</div><div class="kpi-val">${fmt(fd.length)}</div><div class="kpi-det">${meetingToDeal}% meeting-to-deal</div></div>
+    <div class="kpi${ak==='pipeline-value'?' kpi-active':''}" onclick="toggleKpiDrawer('pipeline-value')">
+      ${info(`<strong>Pipeline Value</strong><br>Total dollar value of all <em>open</em> deals across 4 active stages: Discovery Completed, Negotiation, Attack List, and Contract Sent.<span class="tt-formula">${pipeDeals.length} open deals = ${fmtD(pipeVal)}</span>Closed Won and Closed Lost deals are excluded. This is your live working pipeline.`)}
+      <div class="kpi-lbl">Pipeline Value</div><div class="kpi-val">${fmtD(pipeVal)}</div><div class="kpi-det">${pipeDeals.length} open deals</div></div>
+    <div class="kpi${ak==='closed-won'?' kpi-active':''}" onclick="toggleKpiDrawer('closed-won')">
+      ${info(`<strong>Closed Won</strong><br>Total revenue from deals moved to "Closed Won" stage in HubSpot.<span class="tt-formula">${wonDeals.length} won deals = ${fmtD(wonVal)}</span>This is recognized revenue for the period. Click to see each deal, amount, and close date.`)}
+      <div class="kpi-lbl">Closed Won</div><div class="kpi-val">${fmtD(wonVal)}</div><div class="kpi-det">${wonDeals.length} deals won</div></div>
+    <div class="kpi${ak==='win-rate'?' kpi-active':''}" onclick="toggleKpiDrawer('win-rate')">
+      ${info(`<strong>Win Rate</strong><br>Percentage of <em>resolved</em> deals (Won + Lost) that were won. Open deals are not counted since they haven't been decided yet.<span class="tt-formula">${wonDeals.length} won / (${wonDeals.length} won + ${lostDeals.length} lost) = ${winRate}%</span>Industry benchmark for SMB SaaS is 20-30%. Track this monthly to spot trends.`)}
+      <div class="kpi-lbl">Win Rate</div><div class="kpi-val">${winRate}%</div><div class="kpi-det">${wonDeals.length}W / ${lostDeals.length}L of ${closedTotal} closed</div></div>
+    <div class="kpi${ak==='avg-deal'?' kpi-active':''}" onclick="toggleKpiDrawer('avg-deal')">
+      ${info(`<strong>Avg Deal Size</strong><br>Average revenue per Closed Won deal.<span class="tt-formula">${fmtD(wonVal)} / ${wonDeals.length} deals = ${fmtD(avgDeal)}</span>Use this to forecast revenue from pipeline. If your pipeline has 10 open deals, expected revenue ~ 10 x ${fmtD(avgDeal)} x win rate.`)}
+      <div class="kpi-lbl">Avg Deal Size</div><div class="kpi-val">${fmtD(avgDeal)}</div><div class="kpi-det">${wonDeals.length} closed won</div></div>
+    <div class="kpi${ak==='avg-cycle'?' kpi-active':''}" onclick="toggleKpiDrawer('avg-cycle')">
+      ${info(`<strong>Avg Sales Cycle</strong><br>Average days from <em>deal creation in HubSpot</em> to Closed Won. Note: this measures from when the deal record was created, not from the first meeting.<span class="tt-formula">${wonWithDates.length} deals, avg = ${avgCycle} days</span>If deals are created late in the process, this will appear shorter than the true end-to-end cycle. A future improvement: measure from first meeting with the company.`)}
+      <div class="kpi-lbl">Avg Sales Cycle</div><div class="kpi-val">${avgCycle}d</div><div class="kpi-det">${wonWithDates.length} deals measured</div></div>
+    <div class="kpi${ak==='no-shows'?' kpi-active':''}" onclick="toggleKpiDrawer('no-shows')">
+      ${info(`<strong>No Shows</strong><br>Meetings where the prospect didn't attend. The rate is calculated against total meetings booked.<span class="tt-formula">${noShows} no-shows / ${fm.length} total = ${fm.length?Math.round(noShows/fm.length*100):0}%</span>Industry average is 15-20%. High no-show rates suggest weak confirmation sequences or poor lead qualification. Consider adding reminders 24h + 1h before.`)}
+      <div class="kpi-lbl">No Shows</div><div class="kpi-val">${fmt(noShows)}</div><div class="kpi-det">${fm.length?Math.round(noShows/fm.length*100):0}% rate</div></div>
   `;
 }
 
@@ -404,12 +431,21 @@ function renderPipeline(){
     ["216501682","Closed Lost","ps6"],
   ];
   const fmtD=n=>'$'+n.toLocaleString('en-US',{maximumFractionDigits:0});
+  const pipeTips={
+    '1075455291':'First discovery/demo call completed. Prospect fits ICP and has shown initial interest. Next step: send proposal or schedule a follow-up demo.',
+    '1075460493':'Active pricing/terms discussion. Prospect has seen the product and is evaluating. This is where objection handling and ROI justification happen.',
+    '171811493':'High-intent prospects ready for a push. Verbal commitment or strong buying signals received. Focus: get to contract.',
+    '1275009440':'Contract or quote has been sent to the prospect. Waiting for signature. Follow up regularly — deals stall here if left unattended.',
+    '1108564665':'Deal signed and closed. Revenue is recognized. This is your scoreboard.',
+    '216501682':'Deal did not close. Track reasons to improve — pricing, timing, competition, or bad fit. Lost deals are learning opportunities.',
+  };
   let html='';
   stages.forEach(([id,lbl,cls],i)=>{
     const ds=fd.filter(d=>d.stage===id);
     const amt=ds.reduce((s,d)=>s+d.amount,0);
     if(i>0) html+='<div class="pipe-arr">→</div>';
-    html+=`<div class="pipe-s ${cls}${activePipeStage===id?' pipe-active':''}" onclick="togglePipeDrawer('${id}')" title="Click to see ${lbl} deals"><div class="pipe-n">${ds.length}</div><div class="pipe-l">${lbl}</div><div class="pipe-d">${fmtD(amt)}</div></div>`;
+    const tip=pipeTips[id]||'';
+    html+=`<div class="pipe-s ${cls}${activePipeStage===id?' pipe-active':''}" onclick="togglePipeDrawer('${id}')"><div class="pipe-n">${ds.length}</div><div class="pipe-l">${lbl} <span class="pipe-info" onclick="event.stopPropagation()">i<div class="pipe-tooltip"><strong>${lbl}</strong><br>${tip}</div></span></div><div class="pipe-d">${fmtD(amt)}</div></div>`;
   });
   document.getElementById('pipeline').innerHTML=html;
 }
