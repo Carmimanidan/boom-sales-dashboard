@@ -482,9 +482,9 @@ function renderKPIs(){
     <div class="kpi${ak==='avg-cycle'?' kpi-active':''}" onclick="toggleKpiDrawer('avg-cycle')">
       ${info(`<strong>Avg Sales Cycle</strong><br>Average days from <em>first meeting with the company</em> to Closed Won. This measures the true end-to-end buyer journey, not just from when the deal was created in HubSpot.<span class="tt-formula">${wonWithDates.length} deals, avg = ${avgCycle} days</span>If no meeting is linked to the company, falls back to deal creation date. A shorter cycle means faster qualification and closing.`)}
       <div class="kpi-lbl">Avg Sales Cycle</div><div class="kpi-val">${avgCycle}d</div><div class="kpi-det">${wonWithDates.length} deals measured</div></div>
-    <div class="kpi${ak==='no-shows'?' kpi-active':''}" onclick="toggleKpiDrawer('no-shows')">
-      ${info(`<strong>No Shows</strong><br>Meetings where the prospect didn't attend. The rate is calculated against total meetings booked.<span class="tt-formula">${noShows} no-shows / ${fm.length} total = ${fm.length?Math.round(noShows/fm.length*100):0}%</span>Industry average is 15-20%. High no-show rates suggest weak confirmation sequences or poor lead qualification. Consider adding reminders 24h + 1h before.`)}
-      <div class="kpi-lbl">No Shows</div><div class="kpi-val">${fmt(noShows)}</div><div class="kpi-det">${fm.length?Math.round(noShows/fm.length*100):0}% rate</div></div>
+    <div class="kpi${ak==='completed'?' kpi-active':''}" onclick="toggleKpiDrawer('completed')">
+      ${info(`<strong>Completed Meetings</strong><br>Meetings where the prospect attended and the call happened. The completion rate is calculated against total meetings booked.<span class="tt-formula">${completed} completed / ${fm.length} total = ${fm.length?Math.round(completed/fm.length*100):0}%</span>The gap between total and completed includes no-shows (${noShows}), cancellations, and rescheduled meetings.`)}
+      <div class="kpi-lbl">Completed</div><div class="kpi-val">${fmt(completed)}</div><div class="kpi-det">${fm.length?Math.round(completed/fm.length*100):0}% of ${fm.length} booked</div></div>
   `;
 }
 
@@ -896,7 +896,7 @@ function toggleKpiDrawer(type){
   let items=[],title='',cols=[],renderRow=null;
 
   // Meeting-based KPIs
-  const meetingTypes=['total-meetings','no-shows'];
+  const meetingTypes=['total-meetings','completed','no-shows'];
   // Deal-based KPIs
   const dealTypes=['deals-created','pipeline-value','closed-won','win-rate','avg-deal','avg-cycle'];
 
@@ -934,8 +934,9 @@ function toggleKpiDrawer(type){
 
   if(meetingTypes.includes(type)){
     let meetings=fm;
-    if(type==='no-shows') meetings=fm.filter(m=>m.outcome==='NO_SHOW');
-    title=type==='total-meetings'?'All Meetings':'No Shows';
+    if(type==='completed') meetings=fm.filter(m=>m.outcome==='COMPLETED');
+    else if(type==='no-shows') meetings=fm.filter(m=>m.outcome==='NO_SHOW');
+    title=type==='total-meetings'?'All Meetings':type==='completed'?'Completed Meetings':'No Shows';
     items=[...meetings].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     cols=['Date','Company','Title','Agent','Type','Outcome'];
     renderRow=meetingRow;
