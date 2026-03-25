@@ -48,7 +48,7 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
 .wcard.selected .wc-bar-fill{background:linear-gradient(90deg,#60a5fa,#93c5fd)}
 
 /* ── KPI ── */
-.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:28px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
 .kpi{background:linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:18px 22px;position:relative;overflow:hidden;transition:.2s}
 .kpi:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,0,0,.3)}
 .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0}
@@ -58,9 +58,11 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
 .kpi:nth-child(4)::before{background:linear-gradient(90deg,#fbbf24,#f59e0b)}
 .kpi:nth-child(5)::before{background:linear-gradient(90deg,#34d399,#059669)}
 .kpi:nth-child(6)::before{background:linear-gradient(90deg,#f472b6,#ec4899)}
+.kpi:nth-child(7)::before{background:linear-gradient(90deg,#fb923c,#f97316)}
+.kpi:nth-child(8)::before{background:linear-gradient(90deg,#38bdf8,#0ea5e9)}
 .kpi-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:6px}
-.kpi-val{font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1}
-.kpi:nth-child(1) .kpi-val{color:#60a5fa}.kpi:nth-child(2) .kpi-val{color:#34d399}.kpi:nth-child(3) .kpi-val{color:#a78bfa}.kpi:nth-child(4) .kpi-val{color:#fbbf24}.kpi:nth-child(5) .kpi-val{color:#34d399}.kpi:nth-child(6) .kpi-val{color:#f472b6}
+.kpi-val{font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1}
+.kpi:nth-child(1) .kpi-val{color:#60a5fa}.kpi:nth-child(2) .kpi-val{color:#34d399}.kpi:nth-child(3) .kpi-val{color:#a78bfa}.kpi:nth-child(4) .kpi-val{color:#fbbf24}.kpi:nth-child(5) .kpi-val{color:#34d399}.kpi:nth-child(6) .kpi-val{color:#f472b6}.kpi:nth-child(7) .kpi-val{color:#fb923c}.kpi:nth-child(8) .kpi-val{color:#38bdf8}
 .kpi-det{font-size:11px;color:#475569;margin-top:4px}
 
 /* ── Cards & Grid ── */
@@ -140,7 +142,7 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
 .dd-row a:hover{color:#60a5fa;border-color:#60a5fa}
 .kpi{cursor:pointer}.kpi.kpi-active{border-color:rgba(96,165,250,.4);box-shadow:0 0 0 1px rgba(96,165,250,.2)}
 .pipe-s{cursor:pointer}.pipe-s.pipe-active{box-shadow:0 0 0 2px rgba(96,165,250,.4)}
-@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.g2,.g21,.g12,.g3{grid-template-columns:1fr}.md-row{grid-template-columns:60px minmax(80px,1fr) minmax(60px,.8fr) 40px 90px 65px 65px 80px 26px;gap:6px;font-size:11px}.md-row.no-cls{grid-template-columns:60px minmax(80px,1fr) minmax(60px,.8fr) 40px 90px 65px 80px 26px;gap:6px}}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(2,1fr)}.g2,.g21,.g12,.g3{grid-template-columns:1fr}.md-row{grid-template-columns:60px minmax(80px,1fr) minmax(60px,.8fr) 40px 90px 65px 65px 80px 26px;gap:6px;font-size:11px}.md-row.no-cls{grid-template-columns:60px minmax(80px,1fr) minmax(60px,.8fr) 40px 90px 65px 80px 26px;gap:6px}}
 </style>
 </head>
 <body>
@@ -353,20 +355,39 @@ let activeKpi=null;
 function renderKPIs(){
   const fm=getFilteredMeetings(), fd=getFilteredDeals();
   const completed=fm.filter(m=>m.outcome==='COMPLETED').length;
-  const pipeStages=["1075460493","171811493","1275009440"];
+  const pipeStages=["1075455291","1075460493","171811493","1275009440"];
   const pipeDeals=fd.filter(d=>pipeStages.includes(d.stage));
   const pipeVal=pipeDeals.reduce((s,d)=>s+d.amount,0);
   const wonDeals=fd.filter(d=>d.stage==="1108564665");
   const wonVal=wonDeals.reduce((s,d)=>s+d.amount,0);
+  const lostDeals=fd.filter(d=>d.stage==="216501682");
+  const closedTotal=wonDeals.length+lostDeals.length;
+  const winRate=closedTotal>0?Math.round(wonDeals.length/closedTotal*100):0;
+  const avgDeal=wonDeals.length>0?Math.round(wonVal/wonDeals.length):0;
+  const meetingToDeal=completed>0?Math.round(fd.length/completed*100):0;
+  // Avg sales cycle: days from created to closed for won deals
+  let avgCycle=0;
+  const wonWithDates=wonDeals.filter(d=>d.created&&d.closed);
+  if(wonWithDates.length>0){
+    const totalDays=wonWithDates.reduce((s,d)=>{
+      const c=new Date(d.created+'T00:00:00Z');const cl=new Date(d.closed+'T00:00:00Z');
+      return s+Math.max(0,Math.round((cl-c)/(1000*60*60*24)));
+    },0);
+    avgCycle=Math.round(totalDays/wonWithDates.length);
+  }
+  const noShows=fm.filter(m=>m.outcome==='NO_SHOW').length;
   const fmt=n=>n.toLocaleString('en-US');
   const fmtD=n=>'$'+n.toLocaleString('en-US',{maximumFractionDigits:0});
+  const ak=activeKpi;
   document.getElementById('kpis').innerHTML=`
-    <div class="kpi${activeKpi==='total-meetings'?' kpi-active':''}" onclick="toggleKpiDrawer('total-meetings')"><div class="kpi-lbl">Total Meetings</div><div class="kpi-val">${fmt(fm.length)}</div><div class="kpi-det">${HAS_CID?fm.filter(m=>m.cls==='new').length+' new · '+fm.filter(m=>m.cls==='followup').length+' follow-up':'Discovery + Demo'}</div></div>
-    <div class="kpi${activeKpi==='completed'?' kpi-active':''}" onclick="toggleKpiDrawer('completed')"><div class="kpi-lbl">Completed</div><div class="kpi-val">${fmt(completed)}</div><div class="kpi-det">${fm.length?Math.round(completed/fm.length*100):0}% completion</div></div>
-    <div class="kpi${activeKpi==='deals-created'?' kpi-active':''}" onclick="toggleKpiDrawer('deals-created')"><div class="kpi-lbl">Deals Created</div><div class="kpi-val">${fmt(fd.length)}</div><div class="kpi-det">Sales pipeline</div></div>
-    <div class="kpi${activeKpi==='pipeline-value'?' kpi-active':''}" onclick="toggleKpiDrawer('pipeline-value')"><div class="kpi-lbl">Pipeline Value</div><div class="kpi-val">${fmtD(pipeVal)}</div><div class="kpi-det">${pipeDeals.length} open deals</div></div>
-    <div class="kpi${activeKpi==='closed-won'?' kpi-active':''}" onclick="toggleKpiDrawer('closed-won')"><div class="kpi-lbl">Closed Won $</div><div class="kpi-val">${fmtD(wonVal)}</div><div class="kpi-det">${wonDeals.length} deals won</div></div>
-    <div class="kpi${activeKpi==='no-shows'?' kpi-active':''}" onclick="toggleKpiDrawer('no-shows')"><div class="kpi-lbl">No Shows</div><div class="kpi-val">${fmt(fm.filter(m=>m.outcome==='NO_SHOW').length)}</div><div class="kpi-det">${fm.length?Math.round(fm.filter(m=>m.outcome==='NO_SHOW').length/fm.length*100):0}% rate</div></div>
+    <div class="kpi${ak==='total-meetings'?' kpi-active':''}" onclick="toggleKpiDrawer('total-meetings')"><div class="kpi-lbl">Total Meetings</div><div class="kpi-val">${fmt(fm.length)}</div><div class="kpi-det">${completed} completed · ${noShows} no-show</div></div>
+    <div class="kpi${ak==='deals-created'?' kpi-active':''}" onclick="toggleKpiDrawer('deals-created')"><div class="kpi-lbl">Deals Created</div><div class="kpi-val">${fmt(fd.length)}</div><div class="kpi-det">${meetingToDeal}% meeting-to-deal</div></div>
+    <div class="kpi${ak==='pipeline-value'?' kpi-active':''}" onclick="toggleKpiDrawer('pipeline-value')"><div class="kpi-lbl">Pipeline Value</div><div class="kpi-val">${fmtD(pipeVal)}</div><div class="kpi-det">${pipeDeals.length} open deals</div></div>
+    <div class="kpi${ak==='closed-won'?' kpi-active':''}" onclick="toggleKpiDrawer('closed-won')"><div class="kpi-lbl">Closed Won</div><div class="kpi-val">${fmtD(wonVal)}</div><div class="kpi-det">${wonDeals.length} deals won</div></div>
+    <div class="kpi${ak==='win-rate'?' kpi-active':''}" onclick="toggleKpiDrawer('win-rate')"><div class="kpi-lbl">Win Rate</div><div class="kpi-val">${winRate}%</div><div class="kpi-det">${wonDeals.length}W / ${lostDeals.length}L of ${closedTotal} closed</div></div>
+    <div class="kpi${ak==='avg-deal'?' kpi-active':''}" onclick="toggleKpiDrawer('avg-deal')"><div class="kpi-lbl">Avg Deal Size</div><div class="kpi-val">${fmtD(avgDeal)}</div><div class="kpi-det">${wonDeals.length} closed won</div></div>
+    <div class="kpi${ak==='avg-cycle'?' kpi-active':''}" onclick="toggleKpiDrawer('avg-cycle')"><div class="kpi-lbl">Avg Sales Cycle</div><div class="kpi-val">${avgCycle}d</div><div class="kpi-det">${wonWithDates.length} deals measured</div></div>
+    <div class="kpi${ak==='no-shows'?' kpi-active':''}" onclick="toggleKpiDrawer('no-shows')"><div class="kpi-lbl">No Shows</div><div class="kpi-val">${fmt(noShows)}</div><div class="kpi-det">${fm.length?Math.round(noShows/fm.length*100):0}% rate</div></div>
   `;
 }
 
@@ -687,49 +708,59 @@ function toggleKpiDrawer(type){
   const stageClass=s=>({'1108564665':'b-grn','216501682':'b-red','1075460493':'b-ylw','1275009440':'b-prp','171811493':'b-blu','1075455291':'b-blu'})[s]||'b-gry';
   let items=[],title='',cols=[],renderRow=null;
 
-  if(type==='total-meetings'||type==='completed'||type==='no-shows'){
+  // Meeting-based KPIs
+  const meetingTypes=['total-meetings','no-shows'];
+  // Deal-based KPIs
+  const dealTypes=['deals-created','pipeline-value','closed-won','win-rate','avg-deal','avg-cycle'];
+
+  const meetingRow=m=>{
+    const co=m.cid?coMap[m.cid]:null;
+    const coName=co?co.name:'–';
+    const coHtml=m.cid?`<a href="${HS}/0-2/${m.cid}" target="_blank">${coName}</a>`:coName;
+    const outcome=m.outcome||'Pending';
+    const typeClass=m.type==='demo'?'md-type-demo':'md-type-disc';
+    return `<div class="dd-row" style="grid-template-columns:80px minmax(120px,1.5fr) minmax(120px,2fr) 110px 80px 90px">
+      <div style="color:#64748b;font-weight:600">${m.date||'–'}</div>
+      <div>${coHtml}</div>
+      <div><a href="${HS}/0-47/${m.id}" target="_blank">${m.title}</a></div>
+      <div style="color:#94a3b8">${OWNERS[m.owner]||'–'}</div>
+      <div class="${typeClass}">${m.type==='demo'?'Demo':'Discovery'}</div>
+      <div class="md-out md-out-${outcome}">${outLabels[outcome]||outcome}</div>
+    </div>`;
+  };
+  const dealRow=d=>{
+    const co=d.cid?coMap[d.cid]:null;
+    const coName=co?co.name:'–';
+    const coHtml=d.cid?`<a href="${HS}/0-2/${d.cid}" target="_blank">${coName}</a>`:coName;
+    const days=d.created&&d.closed?Math.max(0,Math.round((new Date(d.closed+'T00:00:00Z')-new Date(d.created+'T00:00:00Z'))/(1000*60*60*24))):'–';
+    return `<div class="dd-row" style="grid-template-columns:80px minmax(120px,2fr) minmax(100px,1.2fr) 90px 130px 100px 60px">
+      <div style="color:#64748b;font-weight:600">${d.created||'–'}</div>
+      <div><a href="${HS}/0-3/${d.id}" target="_blank">${d.name}</a></div>
+      <div>${coHtml}</div>
+      <div style="font-weight:700;color:#fbbf24">${fmtD(d.amount)}</div>
+      <div><span class="badge ${stageClass(d.stage)}">${DEAL_STAGES[d.stage]||d.stage}</span></div>
+      <div style="color:#94a3b8">${OWNERS[d.owner]||'–'}</div>
+      <div style="color:#64748b;text-align:center">${days}${days!=='–'?'d':''}</div>
+    </div>`;
+  };
+
+  if(meetingTypes.includes(type)){
     let meetings=fm;
-    if(type==='completed') meetings=fm.filter(m=>m.outcome==='COMPLETED');
-    else if(type==='no-shows') meetings=fm.filter(m=>m.outcome==='NO_SHOW');
-    title=type==='total-meetings'?'All Meetings':type==='completed'?'Completed Meetings':'No Shows';
-    items=meetings.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    if(type==='no-shows') meetings=fm.filter(m=>m.outcome==='NO_SHOW');
+    title=type==='total-meetings'?'All Meetings':'No Shows';
+    items=[...meetings].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     cols=['Date','Company','Title','Agent','Type','Outcome'];
-    renderRow=m=>{
-      const co=m.cid?coMap[m.cid]:null;
-      const coName=co?co.name:'–';
-      const coHtml=m.cid?`<a href="${HS}/0-2/${m.cid}" target="_blank">${coName}</a>`:coName;
-      const outcome=m.outcome||'Pending';
-      const typeClass=m.type==='demo'?'md-type-demo':'md-type-disc';
-      return `<div class="dd-row" style="grid-template-columns:80px minmax(120px,1.5fr) minmax(120px,2fr) 110px 80px 90px">
-        <div style="color:#64748b;font-weight:600">${m.date||'–'}</div>
-        <div>${coHtml}</div>
-        <div><a href="${HS}/0-47/${m.id}" target="_blank">${m.title}</a></div>
-        <div style="color:#94a3b8">${OWNERS[m.owner]||'–'}</div>
-        <div class="${typeClass}">${m.type==='demo'?'Demo':'Discovery'}</div>
-        <div class="md-out md-out-${outcome}">${outLabels[outcome]||outcome}</div>
-      </div>`;
-    };
-  }else{
+    renderRow=meetingRow;
+  }else if(dealTypes.includes(type)){
     let deals=fd;
-    if(type==='deals-created') deals=fd;
-    else if(type==='pipeline-value') deals=fd.filter(d=>["1075460493","171811493","1275009440"].includes(d.stage));
-    else if(type==='closed-won') deals=fd.filter(d=>d.stage==='1108564665');
-    title=type==='deals-created'?'All Deals':type==='pipeline-value'?'Pipeline Deals (Open)':'Closed Won Deals';
-    items=deals.sort((a,b)=>(b.created||'').localeCompare(a.created||''));
-    cols=['Created','Deal','Company','Amount','Stage','Owner'];
-    renderRow=d=>{
-      const co=d.cid?coMap[d.cid]:null;
-      const coName=co?co.name:'–';
-      const coHtml=d.cid?`<a href="${HS}/0-2/${d.cid}" target="_blank">${coName}</a>`:coName;
-      return `<div class="dd-row" style="grid-template-columns:80px minmax(120px,2fr) minmax(100px,1.5fr) 90px 130px 110px">
-        <div style="color:#64748b;font-weight:600">${d.created||'–'}</div>
-        <div><a href="${HS}/0-3/${d.id}" target="_blank">${d.name}</a></div>
-        <div>${coHtml}</div>
-        <div style="font-weight:700;color:#fbbf24">${fmtD(d.amount)}</div>
-        <div><span class="badge ${stageClass(d.stage)}">${DEAL_STAGES[d.stage]||d.stage}</span></div>
-        <div style="color:#94a3b8">${OWNERS[d.owner]||'–'}</div>
-      </div>`;
-    };
+    if(type==='pipeline-value') deals=fd.filter(d=>["1075455291","1075460493","171811493","1275009440"].includes(d.stage));
+    else if(type==='closed-won'||type==='avg-deal'||type==='avg-cycle') deals=fd.filter(d=>d.stage==='1108564665');
+    else if(type==='win-rate') deals=fd.filter(d=>d.stage==='1108564665'||d.stage==='216501682');
+    const titles={'deals-created':'All Deals','pipeline-value':'Open Pipeline Deals','closed-won':'Closed Won Deals','win-rate':'Won + Lost Deals','avg-deal':'Closed Won Deals','avg-cycle':'Closed Won Deals (Cycle Time)'};
+    title=titles[type]||'Deals';
+    items=[...deals].sort((a,b)=>(b.created||'').localeCompare(a.created||''));
+    cols=['Created','Deal','Company','Amount','Stage','Owner','Days'];
+    renderRow=dealRow;
   }
 
   let html=`<div class="dd-header">
