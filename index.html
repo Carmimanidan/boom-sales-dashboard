@@ -123,6 +123,23 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
 .md-mtitle a{color:#e2e8f0;text-decoration:none;transition:.15s}.md-mtitle a:hover{color:#60a5fa}
 .md-listings{font-weight:700;font-size:11px;color:#a78bfa;text-align:center}
 .md-deal-link{text-align:center}.md-deal-link a{color:#60a5fa;text-decoration:none;font-size:14px;opacity:.7;transition:.15s}.md-deal-link a:hover{opacity:1}
+/* ── Detail Drawer ── */
+.detail-drawer{max-height:0;overflow:hidden;transition:max-height .4s ease,opacity .3s ease,padding .3s ease;opacity:0;margin:0 0 0;background:rgba(15,20,35,.92);backdrop-filter:blur(14px);border-radius:14px;border:1px solid transparent}
+.detail-drawer.open{max-height:500px;opacity:1;margin-bottom:20px;padding:16px 20px;border-color:rgba(255,255,255,.06)}
+.dd-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.dd-header .dd-title{font-size:13px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px}
+.dd-header .dd-count{font-size:13px;font-weight:700;color:#60a5fa}
+.dd-header .dd-close{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:#94a3b8;border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:.2s}
+.dd-header .dd-close:hover{background:rgba(244,114,182,.15);color:#f472b6;border-color:rgba(244,114,182,.3)}
+.dd-list{max-height:380px;overflow-y:auto;padding-right:6px}
+.dd-list::-webkit-scrollbar{width:4px}.dd-list::-webkit-scrollbar-track{background:transparent}.dd-list::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}
+.dd-row{display:grid;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;transition:.15s;font-size:12px}
+.dd-row:hover{background:rgba(255,255,255,.04)}
+.dd-row.dd-row-head{color:#475569;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.8px;padding-bottom:4px}
+.dd-row a{color:#e2e8f0;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,.15);transition:.15s}
+.dd-row a:hover{color:#60a5fa;border-color:#60a5fa}
+.kpi{cursor:pointer}.kpi.kpi-active{border-color:rgba(96,165,250,.4);box-shadow:0 0 0 1px rgba(96,165,250,.2)}
+.pipe-s{cursor:pointer}.pipe-s.pipe-active{box-shadow:0 0 0 2px rgba(96,165,250,.4)}
 @media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.g2,.g21,.g12,.g3{grid-template-columns:1fr}.md-row{grid-template-columns:60px minmax(80px,1fr) minmax(60px,.8fr) 40px 90px 65px 65px 80px 26px;gap:6px;font-size:11px}.md-row.no-cls{grid-template-columns:60px minmax(80px,1fr) minmax(60px,.8fr) 40px 90px 65px 80px 26px;gap:6px}}
 </style>
 </head>
@@ -165,9 +182,15 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
 <!-- KPIs -->
 <div class="kpis" id="kpis"></div>
 
+<!-- KPI Drawer -->
+<div class="detail-drawer" id="kpiDrawer"></div>
+
 <!-- Pipeline -->
 <div class="sec-lbl">Deal Pipeline</div>
 <div class="pipe" id="pipeline"></div>
+
+<!-- Pipeline Drawer -->
+<div class="detail-drawer" id="pipeDrawer"></div>
 
 <!-- Charts Row 1 -->
 <div class="grid g2">
@@ -326,6 +349,7 @@ function getFilteredDeals(){
 }
 
 // ── KPIs ──
+let activeKpi=null;
 function renderKPIs(){
   const fm=getFilteredMeetings(), fd=getFilteredDeals();
   const completed=fm.filter(m=>m.outcome==='COMPLETED').length;
@@ -337,16 +361,17 @@ function renderKPIs(){
   const fmt=n=>n.toLocaleString('en-US');
   const fmtD=n=>'$'+n.toLocaleString('en-US',{maximumFractionDigits:0});
   document.getElementById('kpis').innerHTML=`
-    <div class="kpi"><div class="kpi-lbl">Total Meetings</div><div class="kpi-val">${fmt(fm.length)}</div><div class="kpi-det">${HAS_CID?fm.filter(m=>m.cls==='new').length+' new · '+fm.filter(m=>m.cls==='followup').length+' follow-up':'Discovery + Demo'}</div></div>
-    <div class="kpi"><div class="kpi-lbl">Completed</div><div class="kpi-val">${fmt(completed)}</div><div class="kpi-det">${fm.length?Math.round(completed/fm.length*100):0}% completion</div></div>
-    <div class="kpi"><div class="kpi-lbl">Deals Created</div><div class="kpi-val">${fmt(fd.length)}</div><div class="kpi-det">Sales pipeline</div></div>
-    <div class="kpi"><div class="kpi-lbl">Pipeline Value</div><div class="kpi-val">${fmtD(pipeVal)}</div><div class="kpi-det">${pipeDeals.length} open deals</div></div>
-    <div class="kpi"><div class="kpi-lbl">Closed Won $</div><div class="kpi-val">${fmtD(wonVal)}</div><div class="kpi-det">${wonDeals.length} deals won</div></div>
-    <div class="kpi"><div class="kpi-lbl">No Shows</div><div class="kpi-val">${fmt(fm.filter(m=>m.outcome==='NO_SHOW').length)}</div><div class="kpi-det">${fm.length?Math.round(fm.filter(m=>m.outcome==='NO_SHOW').length/fm.length*100):0}% rate</div></div>
+    <div class="kpi${activeKpi==='total-meetings'?' kpi-active':''}" onclick="toggleKpiDrawer('total-meetings')"><div class="kpi-lbl">Total Meetings</div><div class="kpi-val">${fmt(fm.length)}</div><div class="kpi-det">${HAS_CID?fm.filter(m=>m.cls==='new').length+' new · '+fm.filter(m=>m.cls==='followup').length+' follow-up':'Discovery + Demo'}</div></div>
+    <div class="kpi${activeKpi==='completed'?' kpi-active':''}" onclick="toggleKpiDrawer('completed')"><div class="kpi-lbl">Completed</div><div class="kpi-val">${fmt(completed)}</div><div class="kpi-det">${fm.length?Math.round(completed/fm.length*100):0}% completion</div></div>
+    <div class="kpi${activeKpi==='deals-created'?' kpi-active':''}" onclick="toggleKpiDrawer('deals-created')"><div class="kpi-lbl">Deals Created</div><div class="kpi-val">${fmt(fd.length)}</div><div class="kpi-det">Sales pipeline</div></div>
+    <div class="kpi${activeKpi==='pipeline-value'?' kpi-active':''}" onclick="toggleKpiDrawer('pipeline-value')"><div class="kpi-lbl">Pipeline Value</div><div class="kpi-val">${fmtD(pipeVal)}</div><div class="kpi-det">${pipeDeals.length} open deals</div></div>
+    <div class="kpi${activeKpi==='closed-won'?' kpi-active':''}" onclick="toggleKpiDrawer('closed-won')"><div class="kpi-lbl">Closed Won $</div><div class="kpi-val">${fmtD(wonVal)}</div><div class="kpi-det">${wonDeals.length} deals won</div></div>
+    <div class="kpi${activeKpi==='no-shows'?' kpi-active':''}" onclick="toggleKpiDrawer('no-shows')"><div class="kpi-lbl">No Shows</div><div class="kpi-val">${fmt(fm.filter(m=>m.outcome==='NO_SHOW').length)}</div><div class="kpi-det">${fm.length?Math.round(fm.filter(m=>m.outcome==='NO_SHOW').length/fm.length*100):0}% rate</div></div>
   `;
 }
 
 // ── Pipeline ──
+let activePipeStage=null;
 function renderPipeline(){
   const fd=getFilteredDeals();
   const stages=[
@@ -363,7 +388,7 @@ function renderPipeline(){
     const ds=fd.filter(d=>d.stage===id);
     const amt=ds.reduce((s,d)=>s+d.amount,0);
     if(i>0) html+='<div class="pipe-arr">→</div>';
-    html+=`<div class="pipe-s ${cls}"><div class="pipe-n">${ds.length}</div><div class="pipe-l">${lbl}</div><div class="pipe-d">${fmtD(amt)}</div></div>`;
+    html+=`<div class="pipe-s ${cls}${activePipeStage===id?' pipe-active':''}" onclick="togglePipeDrawer('${id}')" title="Click to see ${lbl} deals"><div class="pipe-n">${ds.length}</div><div class="pipe-l">${lbl}</div><div class="pipe-d">${fmtD(amt)}</div></div>`;
   });
   document.getElementById('pipeline').innerHTML=html;
 }
@@ -645,6 +670,127 @@ function updateNavLabel(){
   }
   if(currentView==='monthly'){el.textContent=MONTHS[monthIdx]+' 2026';return}
 }
+
+// ── KPI Drawer ──
+function toggleKpiDrawer(type){
+  const panel=document.getElementById('kpiDrawer');
+  // Close pipeline drawer if open
+  closePipeDrawer();
+  if(activeKpi===type){activeKpi=null;panel.classList.remove('open');panel.innerHTML='';renderKPIs();return}
+  activeKpi=type;
+  renderKPIs();
+  const fm=getFilteredMeetings(), fd=getFilteredDeals();
+  const HS='https://app.hubspot.com/contacts/24030694/record';
+  const coMap={};COMPANIES.forEach(c=>{coMap[c.id]=c});
+  const fmtD=n=>'$'+n.toLocaleString('en-US',{maximumFractionDigits:0});
+  const outLabels={COMPLETED:'Completed',SCHEDULED:'Scheduled',NO_SHOW:'No Show',RESCHEDULED:'Rescheduled',CANCELED:'Canceled'};
+  const stageClass=s=>({'1108564665':'b-grn','216501682':'b-red','1075460493':'b-ylw','1275009440':'b-prp','171811493':'b-blu','1075455291':'b-blu'})[s]||'b-gry';
+  let items=[],title='',cols=[],renderRow=null;
+
+  if(type==='total-meetings'||type==='completed'||type==='no-shows'){
+    let meetings=fm;
+    if(type==='completed') meetings=fm.filter(m=>m.outcome==='COMPLETED');
+    else if(type==='no-shows') meetings=fm.filter(m=>m.outcome==='NO_SHOW');
+    title=type==='total-meetings'?'All Meetings':type==='completed'?'Completed Meetings':'No Shows';
+    items=meetings.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    cols=['Date','Company','Title','Agent','Type','Outcome'];
+    renderRow=m=>{
+      const co=m.cid?coMap[m.cid]:null;
+      const coName=co?co.name:'–';
+      const coHtml=m.cid?`<a href="${HS}/0-2/${m.cid}" target="_blank">${coName}</a>`:coName;
+      const outcome=m.outcome||'Pending';
+      const typeClass=m.type==='demo'?'md-type-demo':'md-type-disc';
+      return `<div class="dd-row" style="grid-template-columns:80px minmax(120px,1.5fr) minmax(120px,2fr) 110px 80px 90px">
+        <div style="color:#64748b;font-weight:600">${m.date||'–'}</div>
+        <div>${coHtml}</div>
+        <div><a href="${HS}/0-47/${m.id}" target="_blank">${m.title}</a></div>
+        <div style="color:#94a3b8">${OWNERS[m.owner]||'–'}</div>
+        <div class="${typeClass}">${m.type==='demo'?'Demo':'Discovery'}</div>
+        <div class="md-out md-out-${outcome}">${outLabels[outcome]||outcome}</div>
+      </div>`;
+    };
+  }else{
+    let deals=fd;
+    if(type==='deals-created') deals=fd;
+    else if(type==='pipeline-value') deals=fd.filter(d=>["1075460493","171811493","1275009440"].includes(d.stage));
+    else if(type==='closed-won') deals=fd.filter(d=>d.stage==='1108564665');
+    title=type==='deals-created'?'All Deals':type==='pipeline-value'?'Pipeline Deals (Open)':'Closed Won Deals';
+    items=deals.sort((a,b)=>(b.created||'').localeCompare(a.created||''));
+    cols=['Created','Deal','Company','Amount','Stage','Owner'];
+    renderRow=d=>{
+      const co=d.cid?coMap[d.cid]:null;
+      const coName=co?co.name:'–';
+      const coHtml=d.cid?`<a href="${HS}/0-2/${d.cid}" target="_blank">${coName}</a>`:coName;
+      return `<div class="dd-row" style="grid-template-columns:80px minmax(120px,2fr) minmax(100px,1.5fr) 90px 130px 110px">
+        <div style="color:#64748b;font-weight:600">${d.created||'–'}</div>
+        <div><a href="${HS}/0-3/${d.id}" target="_blank">${d.name}</a></div>
+        <div>${coHtml}</div>
+        <div style="font-weight:700;color:#fbbf24">${fmtD(d.amount)}</div>
+        <div><span class="badge ${stageClass(d.stage)}">${DEAL_STAGES[d.stage]||d.stage}</span></div>
+        <div style="color:#94a3b8">${OWNERS[d.owner]||'–'}</div>
+      </div>`;
+    };
+  }
+
+  let html=`<div class="dd-header">
+    <div class="dd-title">${title}</div>
+    <div class="dd-count">${items.length} record${items.length!==1?'s':''}</div>
+    <button class="dd-close" onclick="closeKpiDrawer()" title="Close">&times;</button>
+  </div><div class="dd-list">`;
+  html+=`<div class="dd-row dd-row-head" style="grid-template-columns:${renderRow?'':''}">${cols.map(c=>`<div>${c}</div>`).join('')}</div>`;
+  // Re-render the head row with proper grid from the first data row
+  if(items.length>0){
+    const sampleRow=renderRow(items[0]);
+    const gridMatch=sampleRow.match(/grid-template-columns:([^"]+)"/);
+    if(gridMatch) html=html.replace(/<div class="dd-row dd-row-head"[^>]*>/, `<div class="dd-row dd-row-head" style="grid-template-columns:${gridMatch[1]}">`);
+  }
+  items.forEach(item=>{html+=renderRow(item)});
+  html+='</div>';
+  panel.innerHTML=html;
+  panel.classList.add('open');
+}
+function closeKpiDrawer(){activeKpi=null;const p=document.getElementById('kpiDrawer');p.classList.remove('open');p.innerHTML='';renderKPIs()}
+
+// ── Pipeline Drawer ──
+function togglePipeDrawer(stageId){
+  const panel=document.getElementById('pipeDrawer');
+  // Close KPI drawer if open
+  closeKpiDrawer();
+  if(activePipeStage===stageId){activePipeStage=null;panel.classList.remove('open');panel.innerHTML='';renderPipeline();return}
+  activePipeStage=stageId;
+  renderPipeline();
+  const fd=getFilteredDeals().filter(d=>d.stage===stageId);
+  const HS='https://app.hubspot.com/contacts/24030694/record';
+  const coMap={};COMPANIES.forEach(c=>{coMap[c.id]=c});
+  const fmtD=n=>'$'+n.toLocaleString('en-US',{maximumFractionDigits:0});
+  const stageClass=s=>({'1108564665':'b-grn','216501682':'b-red','1075460493':'b-ylw','1275009440':'b-prp','171811493':'b-blu','1075455291':'b-blu'})[s]||'b-gry';
+  const stageName=DEAL_STAGES[stageId]||stageId;
+  const sorted=[...fd].sort((a,b)=>(b.amount||0)-(a.amount||0));
+
+  let html=`<div class="dd-header">
+    <div class="dd-title">${stageName}</div>
+    <div class="dd-count">${sorted.length} deal${sorted.length!==1?'s':''} · ${fmtD(sorted.reduce((s,d)=>s+d.amount,0))}</div>
+    <button class="dd-close" onclick="closePipeDrawer()" title="Close">&times;</button>
+  </div><div class="dd-list">`;
+  html+=`<div class="dd-row dd-row-head" style="grid-template-columns:minmax(140px,2fr) minmax(100px,1.5fr) 90px 110px 80px${stageId==='1108564665'||stageId==='216501682'?' 80px':''}"><div>Deal</div><div>Company</div><div>Amount</div><div>Owner</div><div>Created</div>${stageId==='1108564665'||stageId==='216501682'?'<div>Closed</div>':''}</div>`;
+  sorted.forEach(d=>{
+    const co=d.cid?coMap[d.cid]:null;
+    const coName=co?co.name:'–';
+    const coHtml=d.cid?`<a href="${HS}/0-2/${d.cid}" target="_blank">${coName}</a>`:coName;
+    html+=`<div class="dd-row" style="grid-template-columns:minmax(140px,2fr) minmax(100px,1.5fr) 90px 110px 80px${stageId==='1108564665'||stageId==='216501682'?' 80px':''}">
+      <div><a href="${HS}/0-3/${d.id}" target="_blank">${d.name}</a></div>
+      <div>${coHtml}</div>
+      <div style="font-weight:700;color:#fbbf24">${fmtD(d.amount)}</div>
+      <div style="color:#94a3b8">${OWNERS[d.owner]||'–'}</div>
+      <div style="color:#64748b">${d.created||'–'}</div>
+      ${stageId==='1108564665'||stageId==='216501682'?`<div style="color:#64748b">${d.closed||'–'}</div>`:''}
+    </div>`;
+  });
+  html+='</div>';
+  panel.innerHTML=html;
+  panel.classList.add('open');
+}
+function closePipeDrawer(){activePipeStage=null;const p=document.getElementById('pipeDrawer');p.classList.remove('open');p.innerHTML='';renderPipeline()}
 
 function renderAll(){
   renderKPIs();renderPipeline();renderWeeklyChart();renderOutcomeChart();
