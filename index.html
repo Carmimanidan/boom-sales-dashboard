@@ -23,6 +23,10 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
 .nav-center .nav-arr:hover{background:rgba(96,165,250,.15);color:#60a5fa}
 .nav-center .week-label{font-size:13px;font-weight:600;color:#e2e8f0;min-width:180px;text-align:center}
 .nav-right{font-size:11px;color:#334155}
+.custom-range{display:flex;align-items:center;gap:6px}
+.custom-range input[type="date"]{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#e2e8f0;border-radius:8px;padding:5px 10px;font:500 12px Inter;outline:none;transition:.2s}
+.custom-range input[type="date"]:focus{border-color:rgba(96,165,250,.4);box-shadow:0 0 0 2px rgba(96,165,250,.15)}
+.custom-range input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.7)}
 
 /* ── Week Strip ── */
 .week-strip-wrap{background:rgba(10,14,26,.92);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.06);padding:14px 36px 16px;margin:0 -36px 28px;border-radius:0}
@@ -185,12 +189,19 @@ body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:
   <div class="nav-center">
     <div class="view-btns">
       <button class="active" onclick="setView('all',this)">All</button>
-      <button onclick="setView('weekly',this)">Weekly</button>
+      <button onclick="setView('quarterly',this)">Quarterly</button>
       <button onclick="setView('monthly',this)">Monthly</button>
+      <button onclick="setView('weekly',this)">Weekly</button>
+      <button onclick="setView('custom',this)">Custom</button>
     </div>
     <button class="nav-arr" onclick="changeNav(-1)">&larr;</button>
     <div class="week-label" id="navLabel">All Time (Aug 2025 – Now)</div>
     <button class="nav-arr" onclick="changeNav(1)">&rarr;</button>
+    <div class="custom-range" id="customRange" style="display:none">
+      <input type="date" id="rangeFrom" onchange="applyCustomRange()">
+      <span style="color:#475569;font-size:11px">to</span>
+      <input type="date" id="rangeTo" onchange="applyCustomRange()">
+    </div>
   </div>
   <div class="nav-right">Updated: Mar 25, 2026 15:42</div>
 </div>
@@ -315,7 +326,7 @@ Chart.defaults.plugins.legend.labels.usePointStyle=true;
 const GC='rgba(255,255,255,.04)';
 const TT={backgroundColor:'#1e293b',titleColor:'#e2e8f0',bodyColor:'#94a3b8',borderColor:'rgba(255,255,255,.1)',borderWidth:1,cornerRadius:8,padding:12};
 
-let selectedWeekKey=null, currentView='all', monthIdx=-1, charts={};
+let selectedWeekKey=null, currentView='all', charts={};
 const SALES_AGENTS=["604265803","86713013","78025138"];
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -391,16 +402,25 @@ function weekMeetingCounts(){
   return counts;
 }
 
+// ── Date range filter (universal) ──
+let filterFrom=null, filterTo=null; // 'YYYY-MM-DD' strings or null=all
+
+function inRange(dateStr){
+  if(!dateStr) return false;
+  if(!filterFrom&&!filterTo) return true;
+  if(filterFrom&&dateStr<filterFrom) return false;
+  if(filterTo&&dateStr>filterTo) return false;
+  return true;
+}
+
 function getFilteredMeetings(){
-  if(currentView==='monthly'&&monthIdx>=0) return MEETINGS.filter(m=>m.date&&new Date(m.date+'T00:00:00Z').getUTCMonth()===monthIdx);
-  if(selectedWeekKey) return MEETINGS.filter(m=>m.date&&sunWeekKey(m.date)===selectedWeekKey);
-  return MEETINGS;
+  if(currentView==='weekly'&&selectedWeekKey) return MEETINGS.filter(m=>m.date&&sunWeekKey(m.date)===selectedWeekKey);
+  return MEETINGS.filter(m=>inRange(m.date));
 }
 
 function getFilteredDeals(){
-  if(currentView==='monthly'&&monthIdx>=0) return DEALS.filter(d=>d.created&&new Date(d.created+'T00:00:00Z').getUTCMonth()===monthIdx);
-  if(selectedWeekKey) return DEALS.filter(d=>d.created&&sunWeekKey(d.created)===selectedWeekKey);
-  return DEALS;
+  if(currentView==='weekly'&&selectedWeekKey) return DEALS.filter(d=>d.created&&sunWeekKey(d.created)===selectedWeekKey);
+  return DEALS.filter(d=>inRange(d.created));
 }
 
 // ── KPIs ──
@@ -717,34 +737,93 @@ function renderWeekStrip(){
 }
 
 function selectWeek(key){
-  if(selectedWeekKey===key){selectedWeekKey=null;currentView='all'}else{selectedWeekKey=key;currentView='weekly'}
-  monthIdx=-1;
+  if(selectedWeekKey===key){selectedWeekKey=null;currentView='all';filterFrom=null;filterTo=null}
+  else{selectedWeekKey=key;currentView='weekly'}
   document.querySelectorAll('.view-btns button').forEach(b=>b.classList.remove('active'));
-  document.querySelector(`.view-btns button:nth-child(${selectedWeekKey?2:1})`).classList.add('active');
+  // Weekly is 4th button (All, Quarterly, Monthly, Weekly, Custom)
+  document.querySelector(`.view-btns button:nth-child(${selectedWeekKey?4:1})`).classList.add('active');
+  document.getElementById('customRange').style.display='none';
   updateNavLabel();renderWeekStrip();renderAll();
 }
 
 function selectAll(){
-  selectedWeekKey=null;
-  renderWeekStrip();renderAll();
+  selectedWeekKey=null;currentView='all';filterFrom=null;filterTo=null;
+  document.querySelectorAll('.view-btns button').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.view-btns button:first-child').classList.add('active');
+  document.getElementById('customRange').style.display='none';
+  updateNavLabel();renderWeekStrip();renderAll();
 }
+
+// ── Quarter helpers ──
+function getQuarter(date){
+  const y=date.getUTCFullYear(),m=date.getUTCMonth();
+  const q=Math.floor(m/3)+1;
+  return {year:y,q,label:`Q${q} ${y}`};
+}
+function quarterRange(year,q){
+  const sm=(q-1)*3;
+  const from=year+'-'+String(sm+1).padStart(2,'0')+'-01';
+  const em=sm+3;
+  const ey=em>12?year+1:year;
+  const emm=em>12?em-12:em;
+  // Last day of end month
+  const last=new Date(Date.UTC(ey,emm,0));
+  const to=ey+'-'+String(emm).padStart(2,'0')+'-'+String(last.getUTCDate()).padStart(2,'0');
+  return {from,to};
+}
+
+let currentQuarter=getQuarter(new Date());
+let currentMonth={year:new Date().getUTCFullYear(),month:new Date().getUTCMonth()};
 
 // ── Nav View Controls ──
 function setView(v,btn){
   currentView=v;
+  selectedWeekKey=null;
+  filterFrom=null;filterTo=null;
+  document.getElementById('customRange').style.display='none';
   if(v==='weekly'){
-    // Jump to current week in strip
     selectedWeekKey=currentWeekKey();
-    monthIdx=-1;
   }else if(v==='monthly'){
-    selectedWeekKey=null;
-    monthIdx=new Date().getMonth();
-  }else{
-    selectedWeekKey=null;
-    monthIdx=-1;
+    const now=new Date();
+    currentMonth={year:now.getUTCFullYear(),month:now.getUTCMonth()};
+    applyMonthFilter();
+  }else if(v==='quarterly'){
+    currentQuarter=getQuarter(new Date());
+    applyQuarterFilter();
+  }else if(v==='custom'){
+    document.getElementById('customRange').style.display='flex';
+    // Default to last 30 days
+    const now=new Date();const ago=new Date(now);ago.setUTCDate(now.getUTCDate()-30);
+    const fmt=d=>d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+    document.getElementById('rangeFrom').value=fmt(ago);
+    document.getElementById('rangeTo').value=fmt(now);
+    applyCustomRange();
+    return; // applyCustomRange handles the rest
   }
   document.querySelectorAll('.view-btns button').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
+  updateNavLabel();renderWeekStrip();renderAll();
+}
+
+function applyMonthFilter(){
+  const y=currentMonth.year,m=currentMonth.month;
+  filterFrom=y+'-'+String(m+1).padStart(2,'0')+'-01';
+  const last=new Date(Date.UTC(y,m+1,0));
+  filterTo=y+'-'+String(m+1).padStart(2,'0')+'-'+String(last.getUTCDate()).padStart(2,'0');
+}
+
+function applyQuarterFilter(){
+  const r=quarterRange(currentQuarter.year,currentQuarter.q);
+  filterFrom=r.from;filterTo=r.to;
+}
+
+function applyCustomRange(){
+  const from=document.getElementById('rangeFrom').value;
+  const to=document.getElementById('rangeTo').value;
+  if(from)filterFrom=from;
+  if(to)filterTo=to;
+  document.querySelectorAll('.view-btns button').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.view-btns button:last-child').classList.add('active');
   updateNavLabel();renderWeekStrip();renderAll();
 }
 
@@ -755,7 +834,15 @@ function changeNav(dir){
     selectedWeekKey=allWeekKeys[next];
     renderWeekStrip();
   }else if(currentView==='monthly'){
-    monthIdx=Math.max(0,Math.min(11,monthIdx+dir));
+    currentMonth.month+=dir;
+    if(currentMonth.month>11){currentMonth.month=0;currentMonth.year++}
+    if(currentMonth.month<0){currentMonth.month=11;currentMonth.year--}
+    applyMonthFilter();
+  }else if(currentView==='quarterly'){
+    currentQuarter.q+=dir;
+    if(currentQuarter.q>4){currentQuarter.q=1;currentQuarter.year++}
+    if(currentQuarter.q<1){currentQuarter.q=4;currentQuarter.year--}
+    applyQuarterFilter();
   }
   updateNavLabel();renderAll();
 }
@@ -766,10 +853,18 @@ function updateNavLabel(){
   if(currentView==='weekly'){
     const key=selectedWeekKey||currentWeekKey();
     const r=sunWeekRange(key);
-    el.textContent=r.label;
-    return;
+    el.textContent=r.label;return;
   }
-  if(currentView==='monthly'){el.textContent=MONTHS[monthIdx]+' 2026';return}
+  if(currentView==='monthly'){
+    el.textContent=MONTHS[currentMonth.month]+' '+currentMonth.year;return;
+  }
+  if(currentView==='quarterly'){
+    el.textContent=`Q${currentQuarter.q} ${currentQuarter.year}`;return;
+  }
+  if(currentView==='custom'){
+    const f=filterFrom||'...';const t=filterTo||'...';
+    el.textContent=f+' → '+t;return;
+  }
 }
 
 // ── KPI Drawer ──
