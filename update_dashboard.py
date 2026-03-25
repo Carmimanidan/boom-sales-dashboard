@@ -235,9 +235,13 @@ def fetch_deals():
 
 
 # ── Transform ───────────────────────────────────────────────────────────
+# Companies to always exclude (post-sale but lifecycle not updated in HubSpot)
+EXCLUDE_CIDS = {"36624870933"}  # Simple Life Rentals
+
 def transform_meetings(raw, customer_cids=None):
     """Filter and transform meetings. Excludes non-sales titles and customer companies."""
     customer_cids = customer_cids or set()
+    customer_cids = customer_cids | EXCLUDE_CIDS
     result = []
     for m in raw:
         p = m.get("properties", {})
