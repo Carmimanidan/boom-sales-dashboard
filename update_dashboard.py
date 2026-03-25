@@ -209,6 +209,28 @@ def fetch_deals():
         if not after:
             break
         body["after"] = int(after)
+
+    # Fetch company associations separately (search API doesn't reliably return them)
+    print(f"    Fetching company associations for {len(deals)} deals...")
+    batch_size = 30
+    for i in range(0, len(deals), batch_size):
+        batch = deals[i:i + batch_size]
+        ids = [{"id": d["id"]} for d in batch]
+        try:
+            data = api_post("/crm/v4/associations/deals/companies/batch/read", {"inputs": ids})
+            for r in data.get("results", []):
+                did = r.get("from", {}).get("id")
+                to_list = r.get("to", [])
+                if did and to_list:
+                    for d in batch:
+                        if d["id"] == did:
+                            d.setdefault("associations", {})["companies"] = {
+                                "results": [{"id": t["toObjectId"]} for t in to_list]
+                            }
+                            break
+        except Exception as e:
+            print(f"    ⚠ Deal association batch failed: {e}")
+
     return deals
 
 
