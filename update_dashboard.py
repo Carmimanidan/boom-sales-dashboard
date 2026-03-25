@@ -235,7 +235,9 @@ def fetch_deals():
 
 
 # ── Transform ───────────────────────────────────────────────────────────
-def transform_meetings(raw):
+def transform_meetings(raw, customer_cids=None):
+    """Filter and transform meetings. Excludes non-sales titles and customer companies."""
+    customer_cids = customer_cids or set()
     result = []
     for m in raw:
         p = m.get("properties", {})
@@ -244,10 +246,13 @@ def transform_meetings(raw):
         t_lower = title.lower()
         if "discovery" not in t_lower and "demo" not in t_lower:
             continue
-        start = p.get("hs_meeting_start_time", "")
-        mtype = "demo" if "demo" in t_lower else "discovery"
         assoc = m.get("associations", {}).get("companies", {}).get("results", [])
         cid = assoc[0]["id"] if assoc else None
+        # Exclude meetings with companies that are already customers (post-sale)
+        if cid and str(cid) in customer_cids:
+            continue
+        start = p.get("hs_meeting_start_time", "")
+        mtype = "demo" if "demo" in t_lower else "discovery"
         result.append({
             "id": m["id"],
             "date": start[:10] if start else None,
@@ -375,7 +380,44 @@ def main():
     raw_deals = fetch_deals()
     print(f"    Found {len(raw_deals)} deals")
 
-    meetings = transform_meetings(raw_meetings)
+    # Build set of customer company IDs to exclude from sales meetings
+    # Start with companies from our dataset
+    customer_cids = set()
+    for c in raw_companies:
+        p = c.get("properties", {})
+        if p.get("lifecyclestage") == "customer":
+            customer_cids.add(str(c["id"]))
+
+    # Also check lifecycle for all company IDs linked to meetings (some aren't in raw_companies)
+    meeting_cids = set()
+    for m in raw_meetings:
+        assoc = m.get("associations", {}).get("companies", {}).get("results", [])
+        for a in assoc:
+            cid = str(a.get("id", ""))
+            if cid and cid not in customer_cids:
+                meeting_cids.add(cid)
+    # Remove ones we already know about
+    meeting_cids -= customer_cids
+    if meeting_cids:
+        print(f"    Checking lifecycle for {len(meeting_cids)} additional meeting-linked companies...")
+        batch_size = 100
+        check_list = list(meeting_cids)
+        for i in range(0, len(check_list), batch_size):
+            batch = check_list[i:i + batch_size]
+            try:
+                data = api_post("/crm/v3/objects/companies/batch/read", {
+                    "inputs": [{"id": cid} for cid in batch],
+                    "properties": ["lifecyclestage"],
+                })
+                for r in data.get("results", []):
+                    if r.get("properties", {}).get("lifecyclestage") == "customer":
+                        customer_cids.add(str(r["id"]))
+            except Exception as e:
+                print(f"    ⚠ Lifecycle check failed: {e}")
+
+    print(f"    Found {len(customer_cids)} customer companies to exclude from meetings")
+
+    meetings = transform_meetings(raw_meetings, customer_cids)
     companies = transform_companies(raw_companies)
     deals = transform_deals(raw_deals)
     owners = {k: v for k, v in raw_owners.items() if v.strip()}
