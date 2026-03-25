@@ -420,18 +420,6 @@ function renderAgentChart(){
   });
 }
 
-function renderStageChart(){
-  destroyChart('stage');
-  const counts={};COMPANIES.forEach(c=>{if(c.stage)counts[c.stage]=(counts[c.stage]||0)+1});
-  const order=['Completed','Scheduled','Rescheduled','No Show','Canceled','To Schecule'];
-  const colors=['#34d399','#60a5fa','#fbbf24','#f472b6','#94a3b8','#334155'];
-  const data=order.map(s=>counts[s]||0);
-  charts.stage=new Chart(document.getElementById('chStage'),{
-    type:'doughnut',data:{labels:order,datasets:[{data,backgroundColor:colors,borderWidth:0,hoverOffset:6}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'58%',plugins:{legend:{position:'right',labels:{padding:10,font:{size:11}}},tooltip:TT}}
-  });
-}
-
 function renderPmsChart(){
   destroyChart('pms');
   const counts={};COMPANIES.forEach(c=>{if(c.pms&&c.pms!=='Manual')counts[c.pms]=(counts[c.pms]||0)+1});
@@ -487,32 +475,6 @@ function renderHeatmap(){
   });
   html+='</div>';
   document.getElementById('heatmap').innerHTML=html;
-}
-
-// ── Tables ──
-function renderDeals(){
-  const fd=getFilteredDeals();
-  const stageClass=s=>({
-    '1108564665':'b-grn','216501682':'b-red','1075460493':'b-ylw','1275009440':'b-prp','171811493':'b-blu','1075455291':'b-blu'
-  })[s]||'b-gry';
-  const fmtD=n=>'$'+n.toLocaleString('en-US',{maximumFractionDigits:0});
-  let html='<table class="tbl"><thead><tr><th>Deal</th><th>Amount</th><th>Stage</th><th>Owner</th><th>Created</th></tr></thead><tbody>';
-  fd.forEach(d=>{
-    html+=`<tr><td>${d.name}</td><td>${fmtD(d.amount)}</td><td><span class="badge ${stageClass(d.stage)}">${DEAL_STAGES[d.stage]||d.stage}</span></td><td>${OWNERS[d.owner]||'–'}</td><td>${d.created}</td></tr>`;
-  });
-  html+='</tbody></table>';
-  document.getElementById('dealsBox').innerHTML=html;
-}
-
-function renderCompanies(){
-  const sorted=[...COMPANIES].filter(c=>c.listings).sort((a,b)=>(b.listings||0)-(a.listings||0));
-  const stageClass=s=>({Completed:'b-grn',Scheduled:'b-blu',Rescheduled:'b-ylw','No Show':'b-red',Canceled:'b-gry','To Schecule':'b-prp'})[s]||'b-gry';
-  let html='<table class="tbl"><thead><tr><th>Company</th><th>Listings</th><th>PMS</th><th>Stage</th></tr></thead><tbody>';
-  sorted.slice(0,50).forEach(c=>{
-    html+=`<tr><td>${c.name}</td><td>${c.listings?c.listings.toLocaleString():'–'}</td><td>${c.pms||'–'}</td><td><span class="badge ${stageClass(c.stage)}">${c.stage||'–'}</span></td></tr>`;
-  });
-  html+='</tbody></table>';
-  document.getElementById('compBox').innerHTML=html;
 }
 
 // ── Meeting Detail Panel ──
