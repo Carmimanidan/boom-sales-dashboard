@@ -439,7 +439,11 @@ function renderKPIs(){
   const closedTotal=wonDeals.length+lostDeals.length;
   const winRate=closedTotal>0?Math.round(wonDeals.length/closedTotal*100):0;
   const avgDeal=wonDeals.length>0?Math.round(wonVal/wonDeals.length):0;
-  const meetingToDeal=completed>0?Math.round(fd.length/completed*100):0;
+  // Meeting-to-deal: only count deals whose company had a completed meeting
+  const completedCids=new Set();
+  fm.filter(m=>m.outcome==='COMPLETED'&&m.cid).forEach(m=>completedCids.add(m.cid));
+  const dealsFromMeetings=fd.filter(d=>d.cid&&completedCids.has(d.cid)).length;
+  const meetingToDeal=completed>0?Math.round(dealsFromMeetings/completed*100):0;
   // Avg sales cycle: days from first meeting with company to deal closed
   let avgCycle=0;
   const wonWithDates=wonDeals.filter(d=>d.closed&&(d.cid&&FIRST_MEETING_BY_CID[d.cid]||d.created));
@@ -461,8 +465,8 @@ function renderKPIs(){
       ${info(`<strong>Total Meetings</strong><br>All Discovery and Demo meetings booked in HubSpot since Jul 2025. Includes every outcome: completed, scheduled, no-show, rescheduled, and canceled.<span class="tt-formula">Count of all meeting records</span>Click to see the full list.`)}
       <div class="kpi-lbl">Total Meetings</div><div class="kpi-val">${fmt(fm.length)}</div><div class="kpi-det">${completed} completed · ${noShows} no-show</div></div>
     <div class="kpi${ak==='deals-created'?' kpi-active':''}" onclick="toggleKpiDrawer('deals-created')">
-      ${info(`<strong>Deals Created</strong><br>Deals added to the sales pipeline in HubSpot. The conversion % shows how many completed meetings it takes to generate a deal.<span class="tt-formula">${fd.length} deals / ${completed} completed meetings = ${meetingToDeal}%</span>A higher % means your qualification is tight. A lower % may mean you're taking meetings outside ICP.`)}
-      <div class="kpi-lbl">Deals Created</div><div class="kpi-val">${fmt(fd.length)}</div><div class="kpi-det">${meetingToDeal}% meeting-to-deal</div></div>
+      ${info(`<strong>Deals Created</strong><br>Total deals in the sales pipeline. The conversion % only counts deals linked to a company that had a completed meeting — deals from inbound/referrals without meetings are excluded from the %.<span class="tt-formula">${dealsFromMeetings} linked deals / ${completed} completed meetings = ${meetingToDeal}%</span>This tells you how often a completed meeting turns into a real deal.`)}
+      <div class="kpi-lbl">Deals Created</div><div class="kpi-val">${fmt(fd.length)}</div><div class="kpi-det">${meetingToDeal}% meeting-to-deal (${dealsFromMeetings}/${completed})</div></div>
     <div class="kpi${ak==='pipeline-value'?' kpi-active':''}" onclick="toggleKpiDrawer('pipeline-value')">
       ${info(`<strong>Pipeline Value</strong><br>Total dollar value of all <em>open</em> deals across 4 active stages: Discovery Completed, Negotiation, Attack List, and Contract Sent.<span class="tt-formula">${pipeDeals.length} open deals = ${fmtD(pipeVal)}</span>Closed Won and Closed Lost deals are excluded. This is your live working pipeline.`)}
       <div class="kpi-lbl">Pipeline Value</div><div class="kpi-val">${fmtD(pipeVal)}</div><div class="kpi-det">${pipeDeals.length} open deals</div></div>
