@@ -240,8 +240,12 @@ def transform_meetings(raw):
     for m in raw:
         p = m.get("properties", {})
         title = p.get("hs_meeting_title") or ""
+        # Only keep sales meetings (Discovery / Demo in title)
+        t_lower = title.lower()
+        if "discovery" not in t_lower and "demo" not in t_lower:
+            continue
         start = p.get("hs_meeting_start_time", "")
-        mtype = "demo" if "demo" in title.lower() else "discovery"
+        mtype = "demo" if "demo" in t_lower else "discovery"
         assoc = m.get("associations", {}).get("companies", {}).get("results", [])
         cid = assoc[0]["id"] if assoc else None
         result.append({
