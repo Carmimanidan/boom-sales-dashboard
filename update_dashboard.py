@@ -185,7 +185,7 @@ def fetch_companies():
 def fetch_deals():
     """Fetch deals created in 2026 from the main sales pipeline."""
     deals = []
-    jan1 = int(datetime(2025, 8, 1, tzinfo=timezone.utc).timestamp() * 1000)
+    jan1 = int(datetime(2025, 7, 1, tzinfo=timezone.utc).timestamp() * 1000)
     body = {
         "filterGroups": [{"filters": [
             {"propertyName": "createdate", "operator": "GTE", "value": str(jan1)},
@@ -354,13 +354,13 @@ def inject_data(meetings, companies, deals, owners, updated_at):
 def main():
     print(f"[{datetime.now():%Y-%m-%d %H:%M}] Boom Dashboard — pulling from HubSpot...")
 
-    aug1_2025 = int(datetime(2025, 8, 1, tzinfo=timezone.utc).timestamp() * 1000)
+    jul1_2025 = int(datetime(2025, 7, 1, tzinfo=timezone.utc).timestamp() * 1000)
 
     print("  → Fetching owners...")
     raw_owners = fetch_owners()
 
     print("  → Fetching meetings...")
-    raw_meetings = search_meetings(aug1_2025)
+    raw_meetings = search_meetings(jul1_2025)
     print(f"    Found {len(raw_meetings)} sales meetings")
 
     print("  → Fetching companies...")
