@@ -45,6 +45,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .nav-center .nav-arr:hover{background:rgba(96,165,250,.15);color:#60a5fa}
 .nav-center .week-label{font-size:13px;font-weight:600;color:var(--text);min-width:180px;text-align:center}
 .nav-right{font-size:11px;color:var(--text5)}
+.tab-btns{display:flex;gap:4px;margin-right:16px;padding-right:16px;border-right:1px solid var(--border)}
+.tab-btns button{background:var(--input-bg);border:1px solid var(--border2);color:var(--text2);border-radius:8px;padding:6px 16px;cursor:pointer;font:700 12px Inter;transition:.2s}
+.tab-btns button:hover{color:var(--text);border-color:var(--border3)}
+.tab-btns button.active{background:rgba(96,165,250,.15);color:#60a5fa;border-color:rgba(96,165,250,.3)}
+.tab-content{display:none}.tab-content.active{display:block}
 .theme-toggle{background:var(--input-bg);border:1px solid var(--border2);color:var(--text2);border-radius:8px;padding:6px 12px;cursor:pointer;font:600 11px Inter;transition:.2s;margin-left:12px}
 .theme-toggle:hover{color:var(--text);border-color:var(--border3)}
 .custom-range{display:flex;align-items:center;gap:6px}
@@ -216,10 +221,14 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Nav -->
 <div class="nav">
   <div class="nav-left">
-    <h1>Boom Sales Dashboard</h1>
+    <h1>Boom Dashboard</h1>
     <div class="sub">HubSpot Live Data &middot; Jul 2025 – Present</div>
   </div>
   <div class="nav-center">
+    <div class="tab-btns">
+      <button class="active" onclick="switchTab('sales',this)">Sales</button>
+      <button onclick="switchTab('sdr',this)">SDR</button>
+    </div>
     <div class="view-btns">
       <button class="active" onclick="setView('all',this)">All</button>
       <button onclick="setView('year',this,2025)">2025</button>
@@ -240,6 +249,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
   <div class="nav-right">Updated: Mar 26, 2026 12:54<button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">Light</button></div>
 </div>
+
+<!-- Sales Tab -->
+<div class="tab-content active" id="tabSales">
 
 <!-- KPIs -->
 <div class="kpis" id="kpis"></div>
@@ -313,8 +325,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="card"><div class="card-t">Stale Deals — Needs Attention</div><div class="scroll-box" id="staleBox"></div></div>
 </div>
 
-<!-- SDR Lead Pipelines -->
-<div class="sec-lbl" style="margin-top:32px">SDR Lead Pipelines</div>
+</div><!-- /tabSales -->
+
+<!-- SDR Tab -->
+<div class="tab-content" id="tabSdr">
+<div class="sec-lbl" style="margin-top:8px">SDR Lead Pipelines</div>
 <div class="kpis" id="sdrKpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px"></div>
 <div class="card" style="margin-bottom:20px"><div class="card-t">Pipeline Breakdown</div><div id="sdrPipeTable"></div></div>
 <div class="grid g2">
@@ -325,6 +340,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="card"><div class="card-t">Webinar Breakdown</div><div class="scroll-box" id="sdrWebinarBox"></div></div>
   <div class="card"><div class="card-t">Conference Breakdown</div><div class="scroll-box" id="sdrConfBox"></div></div>
 </div>
+
+</div><!-- /tabSdr -->
 
 </div>
 
@@ -1429,6 +1446,19 @@ function renderAll(){
   renderRevTrend();renderCompRate();renderCountry();renderTopDeals();renderPmsWin();renderDayOfWeek();
   renderHeatmap();renderMeetingDetail();renderForecast();renderStalDeals();
   renderSdr();
+}
+
+// ── Tab Switching ──
+let activeTab='sales';
+function switchTab(tab,btn){
+  activeTab=tab;
+  document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
+  document.getElementById(tab==='sales'?'tabSales':'tabSdr').classList.add('active');
+  document.querySelectorAll('.tab-btns button').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  // Re-render the active tab's charts (Chart.js needs visible canvas)
+  if(tab==='sdr')renderSdr();
+  else renderAll();
 }
 
 // ── Theme Toggle ──
