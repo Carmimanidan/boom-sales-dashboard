@@ -366,7 +366,7 @@ def fetch_sdr_leads():
             "properties": [
                 "hs_lead_name", "hs_pipeline", "hs_pipeline_stage",
                 "hs_lead_status", "createdate", "hs_lastmodifieddate",
-                "conference_name", "webinar_name"
+                "conference_name", "webinar_name", "hs_primary_contact_id"
             ],
         }
         data = api_post("/crm/v3/objects/leads/search", body)
@@ -379,7 +379,48 @@ def fetch_sdr_leads():
     return leads
 
 
-def transform_sdr_leads(raw):
+def fetch_contact_activity(leads):
+    """Batch-read contact activity data for leads that have a primary contact."""
+    contact_map = {}  # contact_id -> activity dict
+    contact_ids = []
+    for l in leads:
+        cid = l.get("properties", {}).get("hs_primary_contact_id")
+        if cid:
+            contact_ids.append(str(int(float(cid))))
+
+    if not contact_ids:
+        return contact_map
+
+    batch_size = 100
+    for i in range(0, len(contact_ids), batch_size):
+        batch = contact_ids[i:i + batch_size]
+        try:
+            data = api_post("/crm/v3/objects/contacts/batch/read", {
+                "inputs": [{"id": cid} for cid in batch],
+                "properties": [
+                    "hs_email_last_send_date", "hs_email_last_reply_date",
+                    "hs_email_last_open_date", "hs_email_sends_since_last_engagement",
+                    "hs_sales_email_last_replied", "hs_email_optout",
+                ],
+            })
+            for r in data.get("results", []):
+                cp = r.get("properties", {})
+                contact_map[r["id"]] = {
+                    "emailed": bool(cp.get("hs_email_last_send_date")),
+                    "replied": bool(cp.get("hs_email_last_reply_date") or cp.get("hs_sales_email_last_replied")),
+                    "opened": bool(cp.get("hs_email_last_open_date")),
+                    "lastSend": (cp.get("hs_email_last_send_date") or "")[:10],
+                    "lastReply": (cp.get("hs_email_last_reply_date") or cp.get("hs_sales_email_last_replied") or "")[:10],
+                    "optedOut": cp.get("hs_email_optout") == "true",
+                }
+        except Exception as e:
+            print(f"    ⚠ Contact activity batch failed: {e}")
+
+    return contact_map
+
+
+def transform_sdr_leads(raw, contact_activity=None):
+    contact_activity = contact_activity or {}
     result = []
     for l in raw:
         p = l.get("properties", {})
@@ -387,6 +428,9 @@ def transform_sdr_leads(raw):
         if pipeline not in SDR_PIPELINES:
             continue
         stage_id = p.get("hs_pipeline_stage") or ""
+        cid = p.get("hs_primary_contact_id")
+        cid_str = str(int(float(cid))) if cid else None
+        activity = contact_activity.get(cid_str, {})
         result.append({
             "id": l["id"],
             "name": p.get("hs_lead_name") or "",
@@ -397,6 +441,12 @@ def transform_sdr_leads(raw):
             "modified": (p.get("hs_lastmodifieddate") or "")[:10],
             "conference": p.get("conference_name"),
             "webinar": p.get("webinar_name"),
+            "emailed": activity.get("emailed", False),
+            "replied": activity.get("replied", False),
+            "opened": activity.get("opened", False),
+            "lastSend": activity.get("lastSend", ""),
+            "lastReply": activity.get("lastReply", ""),
+            "optedOut": activity.get("optedOut", False),
         })
     return result
 
@@ -507,8 +557,12 @@ def main():
 
     print("  → Fetching SDR leads...")
     raw_sdr = fetch_sdr_leads()
-    sdr_leads = transform_sdr_leads(raw_sdr)
-    print(f"    Found {len(sdr_leads)} SDR leads")
+    print(f"    Fetching contact activity for {len(raw_sdr)} leads...")
+    contact_activity = fetch_contact_activity(raw_sdr)
+    sdr_leads = transform_sdr_leads(raw_sdr, contact_activity)
+    emailed = sum(1 for l in sdr_leads if l.get("emailed"))
+    replied = sum(1 for l in sdr_leads if l.get("replied"))
+    print(f"    Found {len(sdr_leads)} SDR leads ({emailed} emailed, {replied} replied)")
 
     updated_at = datetime.now().strftime("%b %d, %Y %H:%M")
     html = inject_data(meetings, companies, deals, owners, sdr_leads, updated_at)
