@@ -324,6 +324,83 @@ def transform_deals(raw):
     return result
 
 
+# ── SDR Leads ──────────────────────────────────────────────────────────
+SDR_PIPELINES = {
+    "875086945": "Email Outbound",
+    "882509401": "LinkedIn Outbound",
+    "lead-pipeline-id": "Website Forms",
+    "879627862": "Webinar",
+    "879819597": "Conference",
+}
+
+SDR_STAGES = {
+    # Email Outbound
+    "1311814179": "New", "1311814180": "Attempting", "1311814181": "Connected",
+    "1311814182": "Meeting Booked", "1313960619": "Qualified", "1311814183": "Disqualified",
+    # LinkedIn Outbound
+    "1326338614": "New", "1326338615": "Attempting", "1326338616": "Connected",
+    "1326338617": "Meeting Booked", "1326338618": "Qualified", "1326338619": "Disqualified",
+    # Website Forms
+    "new-stage-id": "New", "attempting-stage-id": "Attempting", "connected-stage-id": "Connected",
+    "1329066352": "Meeting Booked", "qualified-stage-id": "Qualified", "unqualified-stage-id": "Disqualified",
+    # Webinar
+    "1320256781": "Signed Up", "1320256780": "Attended", "1320255564": "Attempting",
+    "1320255565": "Connected", "1320255566": "Meeting Booked", "1325789260": "Qualified", "1320255567": "Disqualified",
+    # Conference
+    "1320256319": "New", "1320256320": "Attempting", "1320256321": "Connected",
+    "1320256322": "Meeting Booked", "1324914298": "Qualified", "1320256323": "Disqualified",
+}
+
+# Normalized stage order for funnel
+STAGE_ORDER = ["New", "Signed Up", "Attended", "Attempting", "Connected", "Meeting Booked", "Qualified", "Disqualified"]
+
+
+def fetch_sdr_leads():
+    """Fetch all leads from the SDR pipelines."""
+    leads = []
+    after = 0
+    while True:
+        body = {
+            "limit": 100,
+            "after": after,
+            "properties": [
+                "hs_lead_name", "hs_pipeline", "hs_pipeline_stage",
+                "hs_lead_status", "createdate", "hs_lastmodifieddate",
+                "conference_name", "webinar_name"
+            ],
+        }
+        data = api_post("/crm/v3/objects/leads/search", body)
+        for r in data.get("results", []):
+            leads.append(r)
+        paging = data.get("paging", {}).get("next", {})
+        after = paging.get("after")
+        if not after:
+            break
+    return leads
+
+
+def transform_sdr_leads(raw):
+    result = []
+    for l in raw:
+        p = l.get("properties", {})
+        pipeline = p.get("hs_pipeline") or ""
+        if pipeline not in SDR_PIPELINES:
+            continue
+        stage_id = p.get("hs_pipeline_stage") or ""
+        result.append({
+            "id": l["id"],
+            "name": p.get("hs_lead_name") or "",
+            "pipeline": pipeline,
+            "stage": SDR_STAGES.get(stage_id, stage_id),
+            "stageId": stage_id,
+            "created": (p.get("createdate") or "")[:10],
+            "modified": (p.get("hs_lastmodifieddate") or "")[:10],
+            "conference": p.get("conference_name"),
+            "webinar": p.get("webinar_name"),
+        })
+    return result
+
+
 # ── HTML Data Injection ──────────────────────────────────────────────────
 # Instead of regenerating the entire HTML (which falls out of sync with
 # manual UI changes), we read the existing index.html and replace only
@@ -333,7 +410,7 @@ DATA_START = "// ═══════ DATA (auto-generated from HubSpot) ══
 DATA_END   = "// ═══════════════════════════════════════════════════"
 
 
-def inject_data(meetings, companies, deals, owners, updated_at):
+def inject_data(meetings, companies, deals, owners, sdr_leads, updated_at):
     """Read index.html, replace the data block, update the timestamp."""
     html = OUTPUT_PATH.read_text(encoding="utf-8")
 
@@ -345,6 +422,8 @@ def inject_data(meetings, companies, deals, owners, updated_at):
         f"const COMPANIES = {json.dumps(companies)};",
         f"const DEALS = {json.dumps(deals)};",
         f"const DEAL_STAGES = {json.dumps(DEAL_STAGES)};",
+        f"const SDR_LEADS = {json.dumps(sdr_leads)};",
+        f"const SDR_PIPELINES = {json.dumps(SDR_PIPELINES)};",
         DATA_END,
     ])
 
@@ -426,12 +505,17 @@ def main():
     deals = transform_deals(raw_deals)
     owners = {k: v for k, v in raw_owners.items() if v.strip()}
 
+    print("  → Fetching SDR leads...")
+    raw_sdr = fetch_sdr_leads()
+    sdr_leads = transform_sdr_leads(raw_sdr)
+    print(f"    Found {len(sdr_leads)} SDR leads")
+
     updated_at = datetime.now().strftime("%b %d, %Y %H:%M")
-    html = inject_data(meetings, companies, deals, owners, updated_at)
+    html = inject_data(meetings, companies, deals, owners, sdr_leads, updated_at)
 
     OUTPUT_PATH.write_text(html, encoding="utf-8")
     print(f"  ✓ Dashboard saved to {OUTPUT_PATH}")
-    print(f"  ✓ Done! {len(meetings)} meetings · {len(companies)} companies · {len(deals)} deals")
+    print(f"  ✓ Done! {len(meetings)} meetings · {len(companies)} companies · {len(deals)} deals · {len(sdr_leads)} SDR leads")
 
 
 if __name__ == "__main__":
