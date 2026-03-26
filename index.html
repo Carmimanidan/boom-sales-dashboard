@@ -286,6 +286,24 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="card"><div class="card-t">Conversion Funnel</div><div class="cc m"><canvas id="chFunnel"></canvas></div></div>
 </div>
 
+<!-- Monthly Revenue Trend + Completion Rate Trend -->
+<div class="grid g2">
+  <div class="card"><div class="card-t">Monthly Revenue Trend</div><div class="cc m"><canvas id="chRevTrend"></canvas></div></div>
+  <div class="card"><div class="card-t">Weekly Completion Rate</div><div class="cc m"><canvas id="chCompRate"></canvas></div></div>
+</div>
+
+<!-- Country Breakdown + Top Open Deals -->
+<div class="grid g2">
+  <div class="card"><div class="card-t">Meetings &amp; Revenue by Country</div><div class="cc t"><canvas id="chCountry"></canvas></div></div>
+  <div class="card"><div class="card-t">Top Open Deals by Value</div><div class="scroll-box" id="topDealsBox"></div></div>
+</div>
+
+<!-- PMS Win Rate + Day of Week -->
+<div class="grid g2">
+  <div class="card"><div class="card-t">PMS Win Rate</div><div class="cc m"><canvas id="chPmsWin"></canvas></div></div>
+  <div class="card"><div class="card-t">Meetings by Day of Week</div><div class="cc m"><canvas id="chDayOfWeek"></canvas></div></div>
+</div>
+
 <!-- Heatmap -->
 <div class="card" style="margin-bottom:24px"><div class="card-t">Agent &times; Week Heatmap</div><div id="heatmap"></div></div>
 
@@ -1134,6 +1152,152 @@ function renderStalDeals(){
   document.getElementById('staleBox').innerHTML=html;
 }
 
+// ── Monthly Revenue Trend ──
+function renderRevTrend(){
+  destroyChart('revTrend');
+  const months={};
+  DEALS.forEach(d=>{
+    if(d.stage==='1108564665'&&d.closed){
+      const mk=d.closed.slice(0,7);
+      if(!months[mk])months[mk]={rev:0,cnt:0};
+      months[mk].rev+=d.amount;months[mk].cnt++;
+    }
+  });
+  const keys=Object.keys(months).sort();
+  const mNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const labels=keys.map(k=>{const[y,m]=k.split('-');return mNames[parseInt(m)-1]+' '+y.slice(2)});
+  const revData=keys.map(k=>months[k].rev);
+  const cntData=keys.map(k=>months[k].cnt);
+  charts.revTrend=new Chart(document.getElementById('chRevTrend'),{
+    type:'bar',data:{labels,datasets:[
+      {type:'bar',label:'Revenue',data:revData,backgroundColor:'rgba(52,211,153,.4)',borderColor:'#34d399',borderWidth:1,borderRadius:4,borderSkipped:false,yAxisID:'y',barPercentage:.6},
+      {type:'line',label:'Deals',data:cntData,borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,.1)',pointRadius:4,pointBackgroundColor:'#60a5fa',tension:.3,yAxisID:'y1'}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},tooltip:getTT()},scales:{y:{grid:{color:getGC()},beginAtZero:true,ticks:{callback:v=>'$'+v.toLocaleString()}},y1:{position:'right',grid:{display:false},beginAtZero:true,ticks:{stepSize:1}},x:{grid:{display:false}}}}
+  });
+}
+
+// ── Weekly Completion Rate ──
+function renderCompRate(){
+  destroyChart('compRate');
+  const weekData={};
+  MEETINGS.forEach(m=>{
+    if(!m.date)return;
+    const wk=sunWeekKey(m.date);
+    if(!weekData[wk])weekData[wk]={total:0,completed:0};
+    weekData[wk].total++;
+    if(m.outcome==='COMPLETED')weekData[wk].completed++;
+  });
+  const weeks=allWeekKeys.filter(k=>weekData[k]&&weekData[k].total>0);
+  const labels=weeks.map(k=>{const r=sunWeekRange(k);return r.label.split(' – ')[0]});
+  const rates=weeks.map(k=>weekData[k]?Math.round(weekData[k].completed/weekData[k].total*100):0);
+  charts.compRate=new Chart(document.getElementById('chCompRate'),{
+    type:'line',data:{labels,datasets:[{label:'Completion %',data:rates,borderColor:'#34d399',backgroundColor:'rgba(52,211,153,.1)',fill:true,pointRadius:3,pointBackgroundColor:'#34d399',tension:.3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:getTT()},scales:{y:{grid:{color:getGC()},beginAtZero:true,max:100,ticks:{callback:v=>v+'%'}},x:{grid:{display:false}}}}
+  });
+}
+
+// ── Country Breakdown ──
+function renderCountry(){
+  destroyChart('country');
+  const coMap={};COMPANIES.forEach(c=>{coMap[c.id]=c});
+  // Count meetings and won revenue by country
+  const countryMeetings={};const countryRev={};
+  MEETINGS.forEach(m=>{
+    if(!m.cid)return;
+    const co=coMap[m.cid];
+    const country=co&&co.country?co.country:'Unknown';
+    countryMeetings[country]=(countryMeetings[country]||0)+1;
+  });
+  DEALS.forEach(d=>{
+    if(d.stage!=='1108564665'||!d.cid)return;
+    const co=coMap[d.cid];
+    const country=co&&co.country?co.country:'Unknown';
+    countryRev[country]=(countryRev[country]||0)+d.amount;
+  });
+  // Merge and sort by meetings
+  const allCountries=new Set([...Object.keys(countryMeetings),...Object.keys(countryRev)]);
+  const sorted=[...allCountries].map(c=>({name:c,meetings:countryMeetings[c]||0,rev:countryRev[c]||0})).sort((a,b)=>b.meetings-a.meetings).slice(0,12);
+  const labels=sorted.map(c=>c.name);
+  const meetData=sorted.map(c=>c.meetings);
+  const revData=sorted.map(c=>c.rev);
+  charts.country=new Chart(document.getElementById('chCountry'),{
+    type:'bar',data:{labels,datasets:[
+      {label:'Meetings',data:meetData,backgroundColor:'rgba(96,165,250,.5)',borderRadius:3,borderSkipped:false,yAxisID:'y',barPercentage:.5},
+      {label:'Won Revenue',data:revData,backgroundColor:'rgba(52,211,153,.5)',borderRadius:3,borderSkipped:false,yAxisID:'y1',barPercentage:.5}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},tooltip:getTT()},scales:{y:{grid:{color:getGC()},beginAtZero:true,title:{display:true,text:'Meetings',color:'var(--text4)',font:{size:9}}},y1:{position:'right',grid:{display:false},beginAtZero:true,ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'k'},title:{display:true,text:'Revenue',color:'var(--text4)',font:{size:9}}},x:{grid:{display:false}}}}
+  });
+}
+
+// ── Top Open Deals ──
+function renderTopDeals(){
+  const openStages=['1075455291','1075460493','171811493','1275009440'];
+  const open=DEALS.filter(d=>openStages.includes(d.stage)&&d.amount>0);
+  const sorted=[...open].sort((a,b)=>b.amount-a.amount).slice(0,8);
+  const HS='https://app.hubspot.com/contacts/24030694/record';
+  const coMap={};COMPANIES.forEach(c=>{coMap[c.id]=c});
+  const fmtD=n=>'$'+n.toLocaleString('en-US',{maximumFractionDigits:0});
+  const stageClass=s=>({'1108564665':'b-grn','216501682':'b-red','1075460493':'b-ylw','1275009440':'b-prp','171811493':'b-blu','1075455291':'b-blu'})[s]||'b-gry';
+  let html=`<table class="tbl"><thead><tr><th>Deal</th><th>Amount</th><th>Stage</th><th>Age</th></tr></thead><tbody>`;
+  const today=new Date();
+  sorted.forEach(d=>{
+    const age=d.created?Math.round((today-new Date(d.created+'T00:00:00Z'))/(1000*60*60*24)):0;
+    const ageClass=age>14?'stale-red':age>7?'stale-yellow':'stale-green';
+    html+=`<tr><td><a href="${HS}/0-3/${d.id}" target="_blank" style="color:var(--text);text-decoration:none;border-bottom:1px dashed var(--border3)">${d.name}</a></td><td style="font-weight:700;color:#fbbf24">${fmtD(d.amount)}</td><td><span class="badge ${stageClass(d.stage)}">${DEAL_STAGES[d.stage]||d.stage}</span></td><td><span class="stale-age ${ageClass}">${age}d</span></td></tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById('topDealsBox').innerHTML=html||'<div style="color:var(--text4);padding:16px;font-size:12px">No open deals with amount</div>';
+}
+
+// ── PMS Win Rate ──
+function renderPmsWin(){
+  destroyChart('pmsWin');
+  const coMap={};COMPANIES.forEach(c=>{coMap[c.id]=c});
+  const pmsStats={};
+  DEALS.forEach(d=>{
+    if(!d.cid||!['1108564665','216501682'].includes(d.stage))return;
+    const co=coMap[d.cid];
+    const pms=co&&co.pms?co.pms:'Unknown';
+    if(pms==='Manual'||pms==='Unknown')return;
+    if(!pmsStats[pms])pmsStats[pms]={won:0,lost:0};
+    if(d.stage==='1108564665')pmsStats[pms].won++;
+    else pmsStats[pms].lost++;
+  });
+  // Only show PMS with 2+ closed deals
+  const filtered=Object.entries(pmsStats).filter(([,v])=>(v.won+v.lost)>=2).sort((a,b)=>{
+    const rateA=a[1].won/(a[1].won+a[1].lost);const rateB=b[1].won/(b[1].won+b[1].lost);return rateB-rateA;
+  });
+  if(filtered.length===0){document.getElementById('chPmsWin').parentElement.innerHTML='<div style="color:var(--text4);padding:40px;text-align:center;font-size:12px">Not enough data (need 2+ closed deals per PMS)</div>';return}
+  const labels=filtered.map(([k])=>k);
+  const wonData=filtered.map(([,v])=>v.won);
+  const lostData=filtered.map(([,v])=>v.lost);
+  charts.pmsWin=new Chart(document.getElementById('chPmsWin'),{
+    type:'bar',data:{labels,datasets:[
+      {label:'Won',data:wonData,backgroundColor:'rgba(52,211,153,.6)',borderRadius:3,borderSkipped:false},
+      {label:'Lost',data:lostData,backgroundColor:'rgba(244,114,182,.4)',borderRadius:3,borderSkipped:false}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},tooltip:getTT()},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,grid:{color:getGC()},beginAtZero:true}}}
+  });
+}
+
+// ── Day of Week ──
+function renderDayOfWeek(){
+  destroyChart('dayOfWeek');
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const counts=[0,0,0,0,0,0,0];
+  const completed=[0,0,0,0,0,0,0];
+  MEETINGS.forEach(m=>{
+    if(!m.date)return;
+    const d=new Date(m.date+'T00:00:00Z').getUTCDay();
+    counts[d]++;
+    if(m.outcome==='COMPLETED')completed[d]++;
+  });
+  charts.dayOfWeek=new Chart(document.getElementById('chDayOfWeek'),{
+    type:'bar',data:{labels:days,datasets:[
+      {label:'Total',data:counts,backgroundColor:'rgba(96,165,250,.4)',borderRadius:4,borderSkipped:false,barPercentage:.6},
+      {label:'Completed',data:completed,backgroundColor:'rgba(52,211,153,.6)',borderRadius:4,borderSkipped:false,barPercentage:.6}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},tooltip:getTT()},scales:{y:{grid:{color:getGC()},beginAtZero:true},x:{grid:{display:false}}}}
+  });
+}
+
 // ── SDR Rendering ──
 function renderSdr(){
   if(typeof SDR_LEADS==='undefined'||!SDR_LEADS.length) return;
@@ -1262,6 +1426,7 @@ function renderSdr(){
 function renderAll(){
   renderKPIs();renderPipeline();renderWeeklyChart();renderOutcomeChart();
   renderAgentChart();renderPmsChart();renderSizeChart();renderFunnelChart();
+  renderRevTrend();renderCompRate();renderCountry();renderTopDeals();renderPmsWin();renderDayOfWeek();
   renderHeatmap();renderMeetingDetail();renderForecast();renderStalDeals();
   renderSdr();
 }
